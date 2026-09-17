@@ -1,0 +1,2991 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wilson 投資追蹤系統</title>
+<style>
+  :root {
+    --blue: #1A5276; --blue-light: #D6EAF8; --blue-mid: #2E86C1;
+    --green: #1E8449; --green-light: #D5F5E3; --green-mid: #27AE60;
+    --red: #C0392B; --red-light: #FADBD8; --red-mid: #E74C3C;
+    --amber: #D35400; --amber-light: #FDEBD0; --amber-mid: #E67E22;
+    --purple: #6C3483; --purple-light: #E8DAEF;
+    --gold: #B7950B; --gold-light: #FEF9E7;
+    --teal: #0E6655; --teal-light: #D1F2EB; --teal-mid: #17A589;
+    --gray: #F2F3F4; --gray-mid: #D5D8DC; --gray-dark: #555;
+    --white: #fff; --black: #111;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'PingFang TC', sans-serif; background: #EAF0F6; color: var(--black); font-size: 14px; }
+
+  /* NAV */
+  header { background: var(--blue); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header .date { font-size: 13px; opacity: 0.8; margin-left: auto; }
+  nav { background: #154360; display: flex; overflow-x: auto; }
+  nav button { color: rgba(255,255,255,0.7); background: none; border: none; padding: 10px 18px; cursor: pointer; font-size: 13px; white-space: nowrap; transition: all 0.2s; border-bottom: 3px solid transparent; }
+  nav button:hover { color: white; background: rgba(255,255,255,0.08); }
+  nav button.active { color: white; border-bottom-color: #F39C12; font-weight: 600; }
+
+  /* MAIN */
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* CARDS */
+  .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--blue); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--blue-light); display: flex; align-items: center; gap: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  /* STATUS BADGES */
+  .mode-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 15px; }
+  .mode-attack { background: var(--green); color: white; }
+  .mode-balance { background: var(--blue-mid); color: white; }
+  .mode-defend { background: var(--amber); color: white; }
+  .mode-rest { background: var(--red); color: white; }
+  .alert-box { border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; font-weight: 600; font-size: 13px; }
+  .alert-ok { background: var(--green-light); color: var(--green); border-left: 4px solid var(--green); }
+  .alert-warn { background: var(--amber-light); color: var(--amber); border-left: 4px solid var(--amber); }
+  .alert-danger { background: var(--red-light); color: var(--red); border-left: 4px solid var(--red); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+  /* STAT BOXES */
+  .stat-box { background: var(--gray); border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-box .label { font-size: 11px; color: var(--gray-dark); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-box .value { font-size: 24px; font-weight: 700; }
+  .stat-box .sub { font-size: 11px; color: var(--gray-dark); margin-top: 2px; }
+  .stat-green { background: var(--green-light); } .stat-green .value { color: var(--green); }
+  .stat-red { background: var(--red-light); } .stat-red .value { color: var(--red); }
+  .stat-amber { background: var(--amber-light); } .stat-amber .value { color: var(--amber); }
+  .stat-blue { background: var(--blue-light); } .stat-blue .value { color: var(--blue); }
+
+  /* SCORE INPUTS */
+  .score-row { display: flex; align-items: center; background: var(--gray); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; gap: 12px; }
+  .score-row .q { flex: 1; font-size: 13px; }
+  .score-row .opts { display: flex; gap: 6px; }
+  .score-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--gray-mid); background: white; cursor: pointer; font-weight: 700; font-size: 14px; transition: all 0.15s; }
+  .score-btn:hover { border-color: var(--blue-mid); }
+  .score-btn.selected-0 { background: var(--red); border-color: var(--red); color: white; }
+  .score-btn.selected-1 { background: var(--amber); border-color: var(--amber); color: white; }
+  .score-btn.selected-2 { background: var(--green); border-color: var(--green); color: white; }
+
+  /* FORMS */
+  label { display: block; font-size: 12px; color: var(--gray-dark); margin-bottom: 4px; font-weight: 600; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--gray-mid); border-radius: 6px; font-size: 13px; transition: border 0.2s; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 2px var(--blue-light); }
+  textarea { resize: vertical; min-height: 60px; }
+  .form-group { margin-bottom: 10px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* BUTTONS */
+  .btn { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: #154360; }
+  .btn-green { background: var(--green); color: white; }
+  .btn-green:hover { background: #196F3D; }
+  .btn-red { background: var(--red); color: white; }
+  .btn-red:hover { background: #A93226; }
+  .btn-amber { background: var(--amber); color: white; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-ghost { background: transparent; border: 1px solid var(--gray-mid); color: var(--gray-dark); }
+  .btn-ghost:hover { background: var(--gray); }
+
+  /* TABLES */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { background: var(--blue); color: white; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; }
+  .tbl td { padding: 8px 10px; border-bottom: 1px solid var(--gray); }
+  .tbl tr:hover td { background: var(--gray); }
+  .tbl .win { color: var(--green); font-weight: 700; }
+  .tbl .loss { color: var(--red); font-weight: 700; }
+  .tbl .open { color: var(--blue-mid); font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge-e { background: var(--teal-light); color: var(--teal); }
+  .badge-g { background: var(--green-light); color: var(--green); }
+  .badge-a { background: var(--green-light); color: var(--green); }
+  .badge-b { background: var(--blue-light); color: var(--blue); }
+  .badge-c { background: var(--gold-light); color: var(--gold); }
+  .badge-d { background: var(--purple-light); color: var(--purple); }
+
+  /* PROGRESS BAR */
+  .prog-bar { background: var(--gray-mid); border-radius: 20px; height: 10px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 20px; transition: width 0.5s; }
+
+  /* BUCKET CARDS */
+  .bucket { border-radius: 10px; padding: 16px; }
+  .bucket-e { background: linear-gradient(135deg, #D1F2EB, #A3E4D7); border: 2px solid var(--teal-mid); }
+  .bucket-g { background: linear-gradient(135deg, #D5F5E3, #A9DFBF); border: 2px solid var(--green); }
+  .bucket-a { background: linear-gradient(135deg, #D5F5E3, #A9DFBF); border: 2px solid var(--green); }
+  .bucket-b { background: linear-gradient(135deg, #D6EAF8, #A9CCE3); border: 2px solid var(--blue-mid); }
+  .bucket-c { background: linear-gradient(135deg, #FEF9E7, #FAD7A0); border: 2px solid var(--gold); }
+  .bucket-d { background: linear-gradient(135deg, #E8DAEF, #D2B4DE); border: 2px solid var(--purple); }
+  .bucket h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .bucket .pct { font-size: 28px; font-weight: 700; }
+  .bucket .target { font-size: 11px; color: var(--gray-dark); }
+
+  /* CHECKLIST */
+  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; background: var(--gray); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: background 0.15s; }
+  .check-item:hover { background: var(--gray-mid); }
+  .check-item input[type=checkbox] { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; cursor: pointer; accent-color: var(--green); }
+  .check-item .check-text { font-size: 13px; flex: 1; }
+  .check-item.checked .check-text { text-decoration: line-through; color: var(--gray-dark); }
+
+  /* DRAWDOWN METER */
+  .dd-meter { position: relative; height: 24px; border-radius: 12px; overflow: hidden; background: linear-gradient(to right, var(--green-light) 0%, #F9E79F 40%, #F5CBA7 60%, var(--red-light) 80%, var(--red) 100%); }
+  .dd-needle { position: absolute; top: 0; width: 4px; height: 100%; background: var(--black); border-radius: 2px; transform: translateX(-50%); transition: left 0.5s; }
+  .dd-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--gray-dark); margin-top: 2px; }
+
+  /* WEEKLY HISTORY */
+  .history-item { background: var(--gray); border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+  .history-score { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; color: white; flex-shrink: 0; }
+  .history-detail { flex: 1; }
+  .history-date { font-size: 11px; color: var(--gray-dark); }
+  .history-mode { font-size: 13px; font-weight: 700; }
+
+  /* TOASTS */
+  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--blue); color: white; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+
+  /* DRAWDOWN SECTION */
+  .dd-section { }
+  .dd-big { font-size: 48px; font-weight: 800; text-align: center; line-height: 1; }
+
+  /* RULE CARD */
+  .rule-card { background: var(--red-light); border-left: 4px solid var(--red); border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
+  .rule-card.ok { background: var(--green-light); border-color: var(--green); }
+
+  @media (max-width: 700px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>📈</div>
+  <h1>Wilson 投資追蹤系統</h1>
+  <span class="date" id="headerDate"></span>
+</header>
+<nav>
+  <button class="active" onclick="showTab('dashboard')">🏠 今日狀態</button>
+  <button onclick="showTab('score')">📊 每週評分</button>
+  <button onclick="showTab('rules')">📐 建倉規則</button>
+  <button onclick="showTab('portfolio')">💼 持倉管理</button>
+  <button onclick="showTab('trades')">📝 交易記錄</button>
+  <button onclick="showTab('review')">🔍 每週回顧</button>
+  <button onclick="showTab('history')">📅 歷史記錄</button>
+  <button onclick="showTab('daily')">📈 每日表現</button>
+</nav>
+
+<main>
+
+<!-- ======== TAB 1: DASHBOARD ======== -->
+<div id="tab-dashboard" class="tab-content active">
+
+  <div id="alertZone"></div>
+
+  <div class="grid-4" style="margin-bottom:10px">
+    <div class="stat-box stat-blue">
+      <div class="label">今週評分</div>
+      <div class="value" id="dash-score">—</div>
+      <div class="sub" id="dash-mode-sub">尚未評分</div>
+    </div>
+    <div class="stat-box" id="dash-dd-box">
+      <div class="label">組合回撤</div>
+      <div class="value" id="dash-dd">—</div>
+      <div class="sub">從高位計算</div>
+    </div>
+    <div class="stat-box stat-blue">
+      <div class="label">操作模式</div>
+      <div class="value" style="font-size:16px;" id="dash-mode">—</div>
+      <div class="sub" id="dash-stocks-limit">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="label">今日持倉數</div>
+      <div class="value" id="dash-positions">0</div>
+      <div class="sub">A+B+D桶合計</div>
+    </div>
+  </div>
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="stat-box" id="dash-pnl-box">
+      <div class="label">浮動盈虧 (已輸入現價)</div>
+      <div class="value" id="dash-unrealized">—</div>
+      <div class="sub" id="dash-unrealized-sub">按持倉現價計算</div>
+    </div>
+    <div class="stat-box" style="background:var(--gray)">
+      <div class="label" style="margin-bottom:6px">快速更新現價</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="fetchAllPrices()" id="fetchBtn">⬇️ 自動抓取 (Yahoo)</button>
+        <span id="fetchStatus" style="font-size:11px;color:var(--gray-dark)"></span>
+      </div>
+      <div style="font-size:11px;color:var(--gray-dark);margin-top:4px">自動抓取失敗時可在持倉表直接輸入現價</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">🏆 已平倉成績</div>
+    <div id="dash-closed-stats"><div style="color:var(--gray-dark);font-size:13px">暫無已平倉記錄</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📉 熔斷狀態</div>
+      <div style="margin-bottom:10px">
+        <div class="dd-meter"><div class="dd-needle" id="ddNeedle" style="left:0%"></div></div>
+        <div class="dd-labels"><span>0%</span><span>-10%</span><span>-15%</span><span>-20%</span><span>-25%+</span></div>
+      </div>
+      <div id="circuitStatus">
+        <div class="alert-box alert-ok">✅ 暫無數據 — 請先設定高位及現值</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="flex:1">
+          <label>組合歷史最高值 (HK$)</label>
+          <input type="number" id="peakVal" placeholder="例：500000" oninput="calcDrawdown()">
+        </div>
+        <div style="flex:1">
+          <label>組合現時值 (HK$)</label>
+          <input type="number" id="currVal" placeholder="例：450000" oninput="calcDrawdown()">
+        </div>
+        <div style="flex:0 0 110px">
+          <label style="display:flex;align-items:center;gap:4px">
+            USD/HKD
+            <button onclick="fetchFxRates()" title="自動抓取全部匯率" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1" id="fetchRateBtn">🔄</button>
+          </label>
+          <input type="number" id="usdRate" step="0.001" value="7.78" oninput="saveAllRates()">
+        </div>
+        <div style="flex:0 0 100px">
+          <label style="font-size:11px">JPY/HKD 🇯🇵</label>
+          <input type="number" id="jpyRate" step="0.0001" value="0.051" oninput="saveAllRates()">
+        </div>
+        <div style="flex:0 0 100px">
+          <label style="font-size:11px">KRW/HKD 🇰🇷</label>
+          <input type="number" id="krwRate" step="0.00001" value="0.0057" oninput="saveAllRates()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🪣 五桶資金現況</div>
+      <div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:700;color:var(--teal)">E桶 ETF (目標35%)</span>
+          <span id="bucket-e-pct" style="font-size:12px;font-weight:700;color:var(--teal)">—</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="bar-e" style="width:0%;background:var(--teal-mid)"></div></div>
+      </div>
+      <div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:700;color:var(--green)">G桶 增長股 (目標25%)</span>
+          <span id="bucket-g-pct" style="font-size:12px;font-weight:700;color:var(--green)">—</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="bar-g" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:700;color:var(--blue-mid)">B桶 VCP Swing (目標20%)</span>
+          <span id="bucket-b-pct" style="font-size:12px;font-weight:700;color:var(--blue-mid)">—</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="bar-b" style="width:0%;background:var(--blue-mid)"></div></div>
+      </div>
+      <div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:700;color:var(--gold)">C桶 現金 (目標15%)</span>
+          <span id="bucket-c-pct" style="font-size:12px;font-weight:700;color:var(--gold)">—</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="bar-c" style="width:0%;background:var(--gold)"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:700;color:var(--purple)">D桶 Dream 原始成本 (上限5%) 🌟</span>
+          <span id="bucket-d-pct" style="font-size:12px;font-weight:700;color:var(--purple)">—</span>
+        </div>
+        <div class="prog-bar" style="background:#D2B4DE"><div class="prog-fill" id="bar-d" style="width:0%;background:var(--purple)"></div></div>
+        <div id="bucket-d-warn" style="font-size:11px;color:var(--red);margin-top:2px;display:none">⚠️ D桶原始投入成本超過5%！避免再追加新資金</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap">
+        <div style="flex:1;min-width:70px">
+          <label style="font-size:11px">E桶ETF</label>
+          <input type="number" id="bucketE" placeholder="0" oninput="updateBuckets()">
+          <div id="bucketE-hint" style="font-size:10px;color:var(--teal-mid);margin-top:1px"></div>
+        </div>
+        <div style="flex:1;min-width:70px">
+          <label style="font-size:11px">G桶增長股</label>
+          <input type="number" id="bucketG" placeholder="0" oninput="updateBuckets()">
+          <div id="bucketG-hint" style="font-size:10px;color:var(--green-mid);margin-top:1px"></div>
+        </div>
+        <div style="flex:1;min-width:70px">
+          <label style="font-size:11px">B桶VCP</label>
+          <input type="number" id="bucketB" placeholder="0" oninput="updateBuckets()">
+          <div id="bucketB-hint" style="font-size:10px;color:var(--blue-mid);margin-top:1px"></div>
+        </div>
+        <div style="flex:1;min-width:70px">
+          <label style="font-size:11px">C桶現金 ✏️</label>
+          <input type="number" id="bucketC" placeholder="0" oninput="updateBuckets()">
+          <div style="font-size:10px;color:#aaa;margin-top:1px">手動輸入</div>
+        </div>
+        <div style="flex:1;min-width:70px">
+          <label style="font-size:11px">D桶成本</label>
+          <input type="number" id="bucketD" placeholder="0" oninput="updateBuckets()">
+          <div id="bucketD-hint" style="font-size:10px;color:var(--purple);margin-top:1px"></div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="autoCalcBuckets()" style="font-size:12px">🔄 按持倉自動計算</button>
+        <span id="autocalc-note" style="font-size:11px;color:var(--gray-dark)"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">☀️ 今日開市前清單</div>
+    <div id="dailyChecklist">
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">計算組合現時回撤 — 是否已觸及任何熔斷閾值？</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">今天有哪些按計劃入市的機會？確認是昨晚計劃好的，不是臨時決定</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">所有持倉的止蝕位是否已在系統設置？</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">大市今日預期氣氛？VIX相比昨日有否大幅上升？</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">今日不可做：衝動性買賣，大跌日(-3%以上)入市新倉</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span id="checkCount" style="font-size:12px;color:var(--gray-dark)">0/5 完成</span>
+      <button class="btn btn-ghost btn-sm" onclick="resetChecklist()">重置清單</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📌 今日快速筆記</div>
+    <textarea id="dailyNote" placeholder="記錄今日市場狀況、想法、決定..." style="height:80px" oninput="saveNote()"></textarea>
+    <div style="font-size:11px;color:var(--gray-dark);margin-top:4px" id="noteSavedMsg"></div>
+  </div>
+</div>
+
+<!-- ======== TAB 2: WEEKLY SCORE ======== -->
+<div id="tab-score" class="tab-content">
+  <div class="card">
+    <div class="card-title" style="justify-content:space-between">
+      <span>📊 每週市場環境評分 <span style="font-size:12px;font-weight:400;color:var(--gray-dark)">(每週日填寫)</span></span>
+      <button id="autoScoreBtn" class="btn btn-primary btn-sm" onclick="autoScore()" style="font-size:12px;padding:5px 12px">🔄 自動評分</button>
+    </div>
+    <div id="autoScoreStatus" style="font-size:12px;color:var(--gray-dark);margin-bottom:8px;display:none"></div>
+
+    <div class="score-row">
+      <div class="q">
+        <div style="font-weight:700;margin-bottom:2px">① 納指走勢</div>
+        <div style="font-size:11px;color:var(--gray-dark)">在50日線上=2分 ｜ 在200日線上但低於50日線=1分 ｜ 在200日線下=0分</div>
+      </div>
+      <div class="opts">
+        <button class="score-btn" onclick="setScore('q1',0,this)">0</button>
+        <button class="score-btn" onclick="setScore('q1',1,this)">1</button>
+        <button class="score-btn" onclick="setScore('q1',2,this)">2</button>
+      </div>
+    </div>
+
+    <div class="score-row">
+      <div class="q">
+        <div style="font-weight:700;margin-bottom:2px">② 大市波幅 (VIX)</div>
+        <div style="font-size:11px;color:var(--gray-dark)">VIX &lt; 20 = 2分 ｜ VIX 20-30 = 1分 ｜ VIX &gt; 30 = 0分</div>
+      </div>
+      <div class="opts">
+        <button class="score-btn" onclick="setScore('q2',0,this)">0</button>
+        <button class="score-btn" onclick="setScore('q2',1,this)">1</button>
+        <button class="score-btn" onclick="setScore('q2',2,this)">2</button>
+      </div>
+    </div>
+
+    <div class="score-row">
+      <div class="q">
+        <div style="font-weight:700;margin-bottom:2px">③ 組合動能</div>
+        <div style="font-size:11px;color:var(--gray-dark)">過去4週正回報=2分 ｜ 持平=1分 ｜ 負回報=0分</div>
+      </div>
+      <div class="opts">
+        <button class="score-btn" onclick="setScore('q3',0,this)">0</button>
+        <button class="score-btn" onclick="setScore('q3',1,this)">1</button>
+        <button class="score-btn" onclick="setScore('q3',2,this)">2</button>
+      </div>
+    </div>
+
+    <div class="score-row">
+      <div class="q">
+        <div style="font-weight:700;margin-bottom:2px">④ 市場強勢股數量</div>
+        <div style="font-size:11px;color:var(--gray-dark)">&gt;20隻創新高=2分 ｜ 10-20隻=1分 ｜ &lt;10隻=0分</div>
+      </div>
+      <div class="opts">
+        <button class="score-btn" onclick="setScore('q4',0,this)">0</button>
+        <button class="score-btn" onclick="setScore('q4',1,this)">1</button>
+        <button class="score-btn" onclick="setScore('q4',2,this)">2</button>
+      </div>
+    </div>
+
+    <div style="background:var(--blue);color:white;border-radius:10px;padding:16px;text-align:center;margin:14px 0">
+      <div style="font-size:13px;opacity:0.8;margin-bottom:4px">總分</div>
+      <div style="font-size:52px;font-weight:800;line-height:1" id="totalScore">0</div>
+      <div style="font-size:14px;margin-top:6px;opacity:0.9">/ 8 分</div>
+      <div style="margin-top:10px" id="modeDisplay">
+        <span class="mode-badge mode-rest">請完成評分</span>
+      </div>
+    </div>
+
+    <div id="modeDetail" style="display:none">
+      <div style="background:var(--gray);border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:6px;font-size:14px" id="modeTitle">—</div>
+        <div style="font-size:13px" id="modeRules">—</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>本週備注（市場觀察）</label>
+      <textarea id="scoreNote" placeholder="例：納指在50日線之上，VIX=18，科技股普遍強勢..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveWeeklyScore()">💾 保存本週評分</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 操作模式速查</div>
+    <table class="tbl">
+      <tr><th>總分</th><th>模式</th><th>最多持股</th><th>槓桿上限</th><th>說明</th></tr>
+      <tr><td><strong style="color:var(--green)">7-8</strong></td><td><span class="mode-badge mode-attack" style="font-size:12px">進攻</span></td><td>12-15隻</td><td>1.2x</td><td>積極入市，A桶可滿配</td></tr>
+      <tr><td><strong style="color:var(--blue-mid)">5-6</strong></td><td><span class="mode-badge mode-balance" style="font-size:12px">平衡</span></td><td>8-10隻</td><td>1.0x</td><td>正常操作，不加槓桿</td></tr>
+      <tr><td><strong style="color:var(--amber)">3-4</strong></td><td><span class="mode-badge mode-defend" style="font-size:12px">防守</span></td><td>4-6隻</td><td>0x</td><td>縮減B桶，保護A桶</td></tr>
+      <tr><td><strong style="color:var(--red)">0-2</strong></td><td><span class="mode-badge mode-rest" style="font-size:12px">休息</span></td><td>0-2隻</td><td>0x</td><td>全面休息，最多保留A桶核心</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ======== TAB 3: RULES ======== -->
+<div id="tab-rules" class="tab-content">
+
+  <!-- 分注計算器 -->
+  <div class="card">
+    <div class="card-title">🧮 分注計算器</div>
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="form-group">
+        <label>組合總值 (HK$)</label>
+        <input type="number" id="calc-total" placeholder="例：500000" oninput="calcPositionSize()">
+      </div>
+      <div class="form-group">
+        <label>計劃倉位 (%)</label>
+        <input type="number" id="calc-pct" placeholder="例：8" step="0.5" oninput="calcPositionSize()">
+      </div>
+    </div>
+    <div id="calc-result" style="display:none;background:var(--blue-light);border-radius:8px;padding:14px">
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">全倉金額</div>
+          <div style="font-size:22px;font-weight:700;color:var(--blue)" id="calc-full">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">第一注 60%</div>
+          <div style="font-size:22px;font-weight:700;color:var(--green)" id="calc-first">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">第二注 40%</div>
+          <div style="font-size:22px;font-weight:700;color:var(--blue-mid)" id="calc-second">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">最大虧損 (-7%)</div>
+          <div style="font-size:22px;font-weight:700;color:var(--red)" id="calc-maxloss">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四桶建倉規則 -->
+  <div class="card">
+    <div class="card-title">🪣 各桶建倉規則</div>
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <tr>
+        <th style="width:100px">桶別</th>
+        <th>目標佔比</th>
+        <th>單倉上限</th>
+        <th>持倉數</th>
+        <th>持倉期</th>
+        <th>止蝕</th>
+        <th>分注</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-e" style="font-size:12px">E桶 ETF</span></td>
+        <td><strong>35%</strong></td>
+        <td style="color:var(--amber);font-weight:700">≤20%</td>
+        <td>2–4隻</td>
+        <td>長期持有</td>
+        <td style="color:var(--red)">-12%</td>
+        <td>一次或分批買入<br>升值後不減倉</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-g" style="font-size:12px">G桶 增長股</span></td>
+        <td><strong>25%</strong></td>
+        <td style="color:var(--amber);font-weight:700">≤12%</td>
+        <td>2–4隻</td>
+        <td>2–6個月</td>
+        <td style="color:var(--red)">-8%</td>
+        <td>兩批 (60/40)<br>移動止蝕</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-b" style="font-size:12px">B桶 VCP</span></td>
+        <td><strong>20%</strong></td>
+        <td style="color:var(--amber);font-weight:700">≤8%</td>
+        <td>3–6隻</td>
+        <td>16–30日</td>
+        <td style="color:var(--red)">-7%（硬性）</td>
+        <td>兩批：突破時60%<br>確認後3日40%</td>
+      </tr>
+      <tr>
+        <td><span class="badge" style="background:var(--gold-light);color:var(--gold);font-size:12px">C桶 現金</span></td>
+        <td><strong>15%</strong></td>
+        <td colspan="5" style="color:var(--gray-dark)">保持流動性。熔斷觸發時才動用，平時不投入市場。</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-d" style="font-size:12px">D桶 Dream</span></td>
+        <td><strong>≤5%成本</strong></td>
+        <td style="color:var(--purple);font-weight:700">單倉≤3%</td>
+        <td>2–3隻</td>
+        <td>年底Review</td>
+        <td style="color:var(--green)">不設止蝕</td>
+        <td>升值後毋須減倉<br>讓贏家跑</td>
+      </tr>
+    </table>
+    </div>
+  </div>
+
+  <!-- B桶VCP分注詳細流程 -->
+  <div class="card">
+    <div class="card-title">🔵 B桶 VCP 分注法則詳解</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:var(--green-light);border-radius:8px;padding:14px;border-left:4px solid var(--green)">
+        <div style="font-weight:700;color:var(--green);margin-bottom:8px">📌 第一注 — 60% (突破當日)</div>
+        <div style="font-size:13px;line-height:1.7">
+          ✅ VCP形態完成，突破樞軸點<br>
+          ✅ 成交量 ≥ 前一日80%<br>
+          ✅ 市場環境評分 ≥ 5分<br>
+          ✅ 非大跌日 (Nasdaq日跌 &lt; 1.5%)<br>
+          ❌ 不追高：突破超過3%不入
+        </div>
+      </div>
+      <div style="background:var(--blue-light);border-radius:8px;padding:14px;border-left:4px solid var(--blue-mid)">
+        <div style="font-weight:700;color:var(--blue-mid);margin-bottom:8px">📌 第二注 — 40% (3日確認後)</div>
+        <div style="font-size:13px;line-height:1.7">
+          ✅ 突破後3個交易日仍在樞軸點上方<br>
+          ✅ 第一注未觸及止蝕<br>
+          ✅ 整體大市未轉弱<br>
+          ❌ 股價回落至樞軸點以下：取消第二注<br>
+          ❌ 大市評分跌至3分以下：取消第二注
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移動止蝕規則 -->
+  <div class="card">
+    <div class="card-title">📈 移動止蝕規則（Trailing Stop）</div>
+    <table class="tbl">
+      <tr><th>持倉升幅</th><th>止蝕上移至</th><th>原理</th></tr>
+      <tr><td><strong>+10%</strong></td><td style="color:var(--green);font-weight:700">買入點 +2%（保本）</td><td>確保這筆交易不虧損</td></tr>
+      <tr><td><strong>+20%</strong></td><td style="color:var(--green);font-weight:700">買入點 +10%</td><td>鎖定部分利潤</td></tr>
+      <tr><td><strong>+30%</strong></td><td style="color:var(--green);font-weight:700">買入點 +20%</td><td>繼續讓利潤奔跑</td></tr>
+      <tr><td><strong>每升5%</strong></td><td style="color:var(--green);font-weight:700">距當前價 -8%</td><td>持續移動，保護大部分利潤</td></tr>
+      <tr style="background:var(--red-light)"><td colspan="3" style="color:var(--red);font-weight:700;text-align:center">🚫 嚴禁在 +5% 至 +15% 範圍內主動賣出！這是過去虧損的最大根源。</td></tr>
+    </table>
+  </div>
+
+  <!-- 加碼規則 -->
+  <div class="card">
+    <div class="card-title">⚡ 加碼 & 禁止加碼規則</div>
+    <div class="grid-2">
+      <div>
+        <div style="font-weight:700;color:var(--green);margin-bottom:8px">✅ 可以加碼的情況</div>
+        <div class="rule-card ok">股價突破後上升超過20%，成交量再放大，形成新VCP形態</div>
+        <div class="rule-card ok">加碼金額不超過原始倉位的50%</div>
+        <div class="rule-card ok">加碼後單倉不超過B桶8%上限</div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--red);margin-bottom:8px">❌ 嚴禁加碼的情況</div>
+        <div class="rule-card">向下攤平（股價跌時買入）</div>
+        <div class="rule-card">市場評分低於5分時追加倉位</div>
+        <div class="rule-card">熔斷已觸發（-10%以上回撤）</div>
+        <div class="rule-card">同一行業已有兩隻持倉</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 行業集中度 -->
+  <div class="card">
+    <div class="card-title">🏭 行業集中度規則</div>
+    <table class="tbl">
+      <tr><th>規則</th><th>說明</th></tr>
+      <tr><td style="color:var(--red);font-weight:700">同一行業 ≤ 2隻</td><td>B桶不可同時持有超過2隻同Sector股票（例：不可同時持NVDA+AMD+MU三隻半導體）</td></tr>
+      <tr><td style="color:var(--amber);font-weight:700">半導體行業上限 30%</td><td>A+B桶半導體類（含SMH/DRAM）合計不超過組合30%</td></tr>
+      <tr><td style="color:var(--blue-mid);font-weight:700">ETF不計入行業限制</td><td>QQQ、SMH等ETF不計入個股行業集中度計算</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- ======== TAB 3: PORTFOLIO ======== -->
+<div id="tab-portfolio" class="tab-content">
+
+  <div class="card">
+    <div class="card-title">🪣 五桶持倉管理</div>
+    <div class="grid-3" style="margin-bottom:14px">
+      <div class="bucket bucket-e">
+        <h3 style="color:var(--teal)">🟩 E桶 — ETF (35%)</h3>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">長期持有 · QQQ/SMH/DRAM等 · 止蝕-12%</div>
+        <div id="bucketEList"></div>
+        <button class="btn btn-sm" onclick="openAddPosition('E')" style="margin-top:8px;width:100%;background:var(--teal-mid);color:white">+ 新增ETF持倉</button>
+      </div>
+      <div class="bucket bucket-g">
+        <h3 style="color:var(--green)">🟢 G桶 — 增長股 (25%)</h3>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">持倉2-6個月 · 領導個股 · 止蝕-8%</div>
+        <div id="bucketGList"></div>
+        <button class="btn btn-green btn-sm" onclick="openAddPosition('G')" style="margin-top:8px;width:100%">+ 新增增長股持倉</button>
+      </div>
+      <div class="bucket bucket-b">
+        <h3 style="color:var(--blue-mid)">🔵 B桶 — VCP Swing (20%)</h3>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">持倉16-30日 · VCP入市 · 止蝕-7%</div>
+        <div id="bucketBList"></div>
+        <button class="btn btn-primary btn-sm" onclick="openAddPosition('B')" style="margin-top:8px;width:100%">+ 新增VCP持倉</button>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="bucket bucket-c">
+        <h3 style="color:var(--gold)">🟡 C桶 — 現金緩衝 (15%)</h3>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">保持流動性 · 熔斷時才動用</div>
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">C桶金額</div>
+          <div style="font-size:32px;font-weight:700;color:var(--gold)">HK$<span id="cBucketDisplay">0</span></div>
+          <div style="font-size:11px;color:#888;margin-top:4px" id="cBucketPctDisplay">— 佔組合</div>
+        </div>
+      </div>
+      <div class="bucket bucket-d">
+        <h3 style="color:var(--purple)">🟣 D桶 — Dream 🌟</h3>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">不設止蝕 · 年底Review · 原始投入成本上限5%</div>
+        <div id="bucketDList"></div>
+        <div id="bucketDWarnCard" style="display:none;background:var(--red-light);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--red);font-weight:700;margin-bottom:6px">⚠️ D桶原始投入成本超過5%！避免追加新資金</div>
+        <div style="background:rgba(255,255,255,0.6);border-radius:6px;padding:8px;font-size:11px;color:#666;margin-bottom:6px">
+          📌 規則：不設止蝕。原始投入≤5%，升值後毋須減倉（讓贏家跑！）。每年12月底只問：故事還在嗎？
+        </div>
+        <button class="btn btn-sm" onclick="openAddPosition('D')" style="margin-top:4px;width:100%;background:var(--purple);color:white">+ 新增D桶持倉</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚡ 熔斷機制參考</div>
+    <table class="tbl">
+      <tr><th>回撤閾值</th><th>立即執行</th><th>嚴禁</th></tr>
+      <tr><td style="color:var(--amber);font-weight:700">-10%</td><td>停止B桶新倉，檢視A桶</td><td>不可加碼任何倉位</td></tr>
+      <tr><td style="color:var(--amber);font-weight:700">-15%</td><td>A桶減至2隻，B桶全清，去槓桿</td><td>不可開任何新倉</td></tr>
+      <tr><td style="color:var(--red);font-weight:700">-20%</td><td>A桶剩1隻，現金≥50%</td><td>不可任何買入</td></tr>
+      <tr><td style="color:var(--red);font-weight:700;background:var(--red-light)">-25%</td><td style="background:var(--red-light);color:var(--red);font-weight:700">全部清倉，100%現金，休息2週</td><td style="background:var(--red-light)">絕對不能有例外</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ======== TAB 4: TRADES ======== -->
+<div id="tab-trades" class="tab-content">
+  <div class="card">
+    <div class="card-title">➕ 新增交易記錄</div>
+    <div class="form-row-3">
+      <div class="form-group"><label>股票代碼</label><input id="t-code" placeholder="例：PLTR, 7203.T, 005930.KS" oninput="updatePriceLabels()"></div>
+      <div class="form-group"><label>桶別</label>
+        <select id="t-bucket">
+          <option value="E">E桶 — ETF</option>
+          <option value="G">G桶 — 增長股</option>
+          <option value="B" selected>B桶 — VCP Swing</option>
+          <option value="D">D桶 — Dream 🌟</option>
+        </select>
+      </div>
+      <div class="form-group"><label>交易類型</label>
+        <select id="t-type">
+          <option value="VCP">VCP突破</option>
+          <option value="VCP早">VCP偷步</option>
+          <option value="Bounce">低位反彈</option>
+          <option value="Short">沽空</option>
+          <option value="Other">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group"><label>買入日期</label><input type="date" id="t-buydate"></div>
+      <div class="form-group"><label id="lbl-buyprice">買入價</label><input type="number" id="t-buyprice" placeholder="0.00" step="0.01"></div>
+      <div class="form-group"><label>股數/手數</label><input type="number" id="t-shares" placeholder="0"></div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group"><label id="lbl-stop">止蝕位</label><input type="number" id="t-stop" placeholder="0.00" step="0.01"></div>
+      <div class="form-group"><label id="lbl-target">目標價 (可選)</label><input type="number" id="t-target" placeholder="0.00" step="0.01"></div>
+      <div class="form-group"><label>Sector</label><input id="t-sector" placeholder="例：AI Storage, Fintech"></div>
+    </div>
+    <div class="form-group"><label>備注</label><textarea id="t-note" placeholder="VCP形態、入市原因..." style="height:50px"></textarea></div>
+    <button class="btn btn-green" onclick="addTrade()">➕ 加入記錄</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="justify-content:space-between">
+      <span>📋 持倉中 (Open Positions)</span>
+      <button class="btn btn-ghost btn-sm" onclick="exportOpenCSV()" style="font-size:12px">📥 匯出CSV</button>
+    </div>
+    <div id="openPositions"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉記錄</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">✅ 已平倉記錄</div>
+    <div id="closedTrades"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div></div>
+  </div>
+</div>
+
+<!-- ======== TAB 5: REVIEW ======== -->
+<div id="tab-review" class="tab-content">
+  <div class="card">
+    <div class="card-title">🔍 每週回顧 <span style="font-size:12px;font-weight:400;color:var(--gray-dark)">(每週日填寫，約15分鐘)</span></div>
+
+    <div class="form-group">
+      <label>回顧週期</label>
+      <input type="week" id="reviewWeek">
+    </div>
+
+    <div style="font-weight:700;margin-bottom:8px;color:var(--blue)">① 規則遵守檢查</div>
+    <div id="reviewChecklist">
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">本週沒有在止蝕觸及後「再等一等」</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">本週沒有在VCP持倉+5%至+15%時主動賣出（提早鎖定利潤）</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">本週沒有在大跌日（-3%以上）入市任何新倉</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">D桶(Dream)總倉位未超過5% · B桶無撈底/槓桿操作</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">本週沒有在VCP持倉上「等反彈」而不執行止蝕</div></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox"><div class="check-text">本週每個買賣都是按計劃執行，非情緒驅動</div></div>
+    </div>
+
+    <div style="margin-top:16px;font-weight:700;margin-bottom:8px;color:var(--blue)">② 本週數字</div>
+    <div class="form-row">
+      <div class="form-group"><label>本週盈虧 (HK$)</label><input type="number" id="r-pnl" placeholder="正數=盈利 負數=虧損"></div>
+      <div class="form-group"><label>本週交易次數</label><input type="number" id="r-trades" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>勝出次數</label><input type="number" id="r-wins" placeholder="0"></div>
+      <div class="form-group"><label>組合現時值 (HK$)</label><input type="number" id="r-portval" placeholder="0"></div>
+    </div>
+
+    <div style="margin-top:16px;font-weight:700;margin-bottom:8px;color:var(--blue)">③ 違規記錄（如有）</div>
+    <textarea id="r-violations" placeholder="如有違反規則，寫下原因和下週改進方法..." style="height:70px"></textarea>
+
+    <div style="margin-top:12px;font-weight:700;margin-bottom:8px;color:var(--blue)">④ 下週計劃</div>
+    <textarea id="r-nextweek" placeholder="下週觀察名單、計劃的VCP買入點、市場重點..." style="height:70px"></textarea>
+
+    <div style="margin-top:14px">
+      <button class="btn btn-primary" onclick="saveReview()">💾 保存本週回顧</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🚫 核心規則備忘</div>
+    <div class="rule-card">❌ 嚴禁：在+5%至+15%範圍主動賣出（錯失大升幅的根源）</div>
+    <div class="rule-card">❌ 嚴禁：止蝕觸及後「再等一等」</div>
+    <div class="rule-card">❌ 嚴禁：在大跌日(-3%)入市新倉</div>
+    <div class="rule-card">❌ 嚴禁：D桶原始投入成本超過5% · 撈底 · 槓桿</div>
+    <div class="rule-card ok">🌟 D桶Dream：原始投入≤5%，升值後毋須減倉。每年12月底只問一題：故事還在嗎？</div>
+    <div class="rule-card ok">✅ 升超+10%：止蝕上移至買入點+2%（保本）</div>
+    <div class="rule-card ok">✅ 升超+20%：止蝕上移至+10%位置</div>
+    <div class="rule-card ok">✅ 每升5%：止蝕上移至距當前價-8%</div>
+    <div class="rule-card ok">✅ VCP分兩批進入：60%突破時，40%確認後3日</div>
+  </div>
+</div>
+
+<!-- ======== TAB 6: HISTORY ======== -->
+<div id="tab-history" class="tab-content">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📅 歷史週評分</div>
+      <div id="scoreHistory"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無歷史記錄</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📝 歷史週回顧</div>
+      <div id="reviewHistory"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無歷史記錄</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔑 現價 API 設定 (Finnhub)</div>
+    <div style="font-size:13px;margin-bottom:10px;color:var(--gray-dark)">
+      Finnhub 免費 API 支援 US + HK 股，每分鐘60次，無需信用卡。<br>
+      註冊地址：<strong>finnhub.io</strong> → 登入後複製 API Key 貼入下方。
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div style="flex:1">
+        <label>Finnhub API Key</label>
+        <input type="text" id="finnhubKey" placeholder="例：d0abcxyz123456789" oninput="saveFinnhubKey()" style="font-family:monospace">
+      </div>
+      <button class="btn btn-green" onclick="testFinnhubKey()">測試連線</button>
+    </div>
+    <div id="finnhubStatus" style="font-size:12px;margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">☁️ 雲端同步 (GitHub Gist)</div>
+    <div style="font-size:13px;margin-bottom:12px;color:var(--gray-dark)">
+      免費跨裝置同步。需要一個 <strong>GitHub 免費帳號</strong>，建立 Personal Access Token 即可。
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px">
+      <div style="flex:1">
+        <label>GitHub Personal Access Token <span style="font-size:11px;color:var(--gray-dark)">(需有 gist 權限)</span></label>
+        <input type="text" id="jsonbinKey" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="saveJsonbinKey()" style="font-family:monospace;font-size:12px">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">
+      <div style="flex:1">
+        <label>Gist ID <span style="font-size:11px;color:var(--gray-dark)">(首次點「建立雲端檔案」自動填入)</span></label>
+        <input type="text" id="jsonbinId" placeholder="abc123def456..." oninput="saveJsonbinKey()" style="font-family:monospace;font-size:12px">
+      </div>
+      <button class="btn btn-ghost" onclick="createJsonBin()">建立雲端檔案</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="pushToCloud()">☁️ 推送到雲端</button>
+      <button class="btn btn-green" onclick="pullFromCloud()">⬇️ 從雲端載入</button>
+    </div>
+    <div id="syncStatus" style="font-size:12px;margin-top:8px;color:var(--gray-dark)"></div>
+    <div style="margin-top:12px;padding:10px;background:var(--blue-light);border-radius:8px;font-size:12px;color:var(--blue)">
+      <strong>設定步驟（只需一次）：</strong><br>
+      1. 登入 <strong>github.com</strong> → 右上角頭像 → Settings → Developer settings → Personal access tokens → Tokens (classic)<br>
+      2. 點「Generate new token」→ 勾選 <strong>gist</strong> 權限 → 生成並複製 token<br>
+      3. 貼入上方 Token 欄 → 點「建立雲端檔案」（只需一次，Gist ID 自動填入）<br>
+      4. 電腦點「推送到雲端」存檔；手機打開此 HTML → 輸入相同 Token + Gist ID → 點「從雲端載入」
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ 數據管理</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="exportData()">📤 匯出所有數據 (JSON)</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">📥 匯入數據</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn btn-red" onclick="if(confirm('確定清除所有數據？此操作不可逆！'))clearAllData()">🗑️ 清除所有數據</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== TAB 8: DAILY PERFORMANCE ======== -->
+<div id="tab-daily" class="tab-content">
+
+  <!-- Today's snapshot entry -->
+  <div class="card">
+    <div class="card-title">📈 記錄今日表現</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <div style="flex:0 0 140px">
+        <label style="font-size:11px">日期</label>
+        <input type="date" id="dp-date">
+      </div>
+      <div style="flex:0 0 140px">
+        <label style="font-size:11px">組合總值 (HK$)</label>
+        <input type="number" id="dp-total" placeholder="0">
+      </div>
+      <div style="align-self:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="dpAutoFill()">🔄 自動填入</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="flex:1;min-width:90px">
+        <label style="font-size:11px;color:var(--teal)">E桶 ETF (HK$)</label>
+        <input type="number" id="dp-e" placeholder="0">
+      </div>
+      <div style="flex:1;min-width:90px">
+        <label style="font-size:11px;color:var(--green)">G桶 增長股 (HK$)</label>
+        <input type="number" id="dp-g" placeholder="0">
+      </div>
+      <div style="flex:1;min-width:90px">
+        <label style="font-size:11px;color:var(--blue-mid)">B桶 VCP (HK$)</label>
+        <input type="number" id="dp-b" placeholder="0">
+      </div>
+      <div style="flex:1;min-width:90px">
+        <label style="font-size:11px;color:var(--gray-dark)">C桶 現金 (HK$)</label>
+        <input type="number" id="dp-c" placeholder="0">
+      </div>
+      <div style="flex:1;min-width:90px">
+        <label style="font-size:11px;color:var(--purple)">D桶 Dream (HK$)</label>
+        <input type="number" id="dp-d" placeholder="0">
+      </div>
+    </div>
+
+    <!-- Position changes -->
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">今日倉位變動</label>
+      <div id="dp-changes-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="dpAddChange('open')">➕ 新增倉位</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--amber)" onclick="dpAddChange('partial')">📉 部分平倉</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="dpAddChange('close')">✖️ 全倉平倉</button>
+        <button class="btn btn-ghost btn-sm" onclick="dpAutoDetectChanges()">🔍 自動偵測今日變動</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label style="font-size:12px">備注</label>
+      <textarea id="dp-note" style="height:40px" placeholder="市場觀察、決策原因..."></textarea>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveDailyPerf()">💾 儲存今日記錄</button>
+  </div>
+
+  <!-- Comparison vs previous day -->
+  <div class="card">
+    <div class="card-title">📊 今日 vs 上一交易日</div>
+    <div id="dp-comparison"><div style="color:var(--gray-dark);font-size:13px">儲存今日記錄後顯示比較</div></div>
+  </div>
+
+  <!-- History table -->
+  <div class="card">
+    <div class="card-title">📋 每日表現歷史</div>
+    <div id="dp-history"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div></div>
+  </div>
+
+</div>
+
+</main>
+
+<!-- ADD POSITION MODAL -->
+<div id="posModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:none;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:20px;width:380px;max-width:95vw">
+    <h3 style="margin-bottom:14px;color:var(--blue)" id="posModalTitle">新增持倉</h3>
+    <div class="form-group"><label>股票代碼</label><input id="pos-code" placeholder="例：MU"></div>
+    <div class="form-row">
+      <div class="form-group"><label>買入價</label><input type="number" id="pos-price" step="0.01"></div>
+      <div class="form-group"><label>股數</label><input type="number" id="pos-shares"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>止蝕位</label><input type="number" id="pos-stop" step="0.01"></div>
+      <div class="form-group"><label>目標價</label><input type="number" id="pos-target" step="0.01"></div>
+    </div>
+    <div class="form-group"><label>買入日期</label><input type="date" id="pos-date"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="savePosition()">✅ 確認</button>
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT TRADE MODAL -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:20px;width:420px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <h3 style="margin-bottom:4px;color:var(--blue)" id="editModalTitle">✏️ 編輯持倉</h3>
+    <div id="edit-code-display" style="font-size:13px;color:var(--gray-dark);margin-bottom:14px"></div>
+    <div class="form-row">
+      <div class="form-group"><label>股票代碼</label><input type="text" id="edit-code-input" placeholder="例：MU"></div>
+      <div class="form-group"><label>桶別</label>
+        <select id="edit-bucket">
+          <option value="E">E桶 — ETF</option>
+          <option value="G">G桶 — 增長股</option>
+          <option value="B">B桶 — VCP</option>
+          <option value="D">D桶 — Dream</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>交易類型</label>
+        <select id="edit-type">
+          <option value="VCP">VCP突破</option>
+          <option value="VCP早">VCP偷步</option>
+          <option value="Bounce">低位反彈</option>
+          <option value="Short">沽空</option>
+          <option value="Other">其他</option>
+        </select>
+      </div>
+      <div class="form-group"><label>股數</label><input type="number" id="edit-shares"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>買入日期</label><input type="date" id="edit-date"></div>
+      <div class="form-group"><label>買入價</label><input type="number" id="edit-price" step="0.01"></div>
+    </div>
+    <div class="form-row" id="edit-open-fields">
+      <div class="form-group"><label>止蝕位</label><input type="number" id="edit-stop" step="0.01"></div>
+      <div class="form-group"><label>目標價</label><input type="number" id="edit-target" step="0.01"></div>
+    </div>
+    <!-- 已平倉專用欄位 -->
+    <div class="form-row" id="edit-closed-fields" style="display:none">
+      <div class="form-group"><label>賣出日期</label><input type="date" id="edit-selldate"></div>
+      <div class="form-group"><label>賣出價</label><input type="number" id="edit-sellprice" step="0.01"></div>
+    </div>
+    <div class="form-group"><label>Sector</label><input type="text" id="edit-sector" placeholder="例：AI Storage"></div>
+    <div class="form-group"><label>備注</label><textarea id="edit-note" style="height:50px"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEditTrade()">✅ 儲存更改</button>
+      <button class="btn btn-ghost btn-sm" id="edit-reopen-btn" style="display:none" onclick="reopenTrade()">↩️ 重新開倉</button>
+      <button class="btn btn-ghost" onclick="closeEditModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSE TRADE MODAL -->
+<div id="closeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:20px;width:380px;max-width:95vw">
+    <h3 style="margin-bottom:4px;color:var(--amber)">💰 平倉</h3>
+    <div id="close-trade-info" style="font-size:13px;color:var(--gray-dark);margin-bottom:14px"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label id="close-sellprice-lbl">賣出價</label>
+        <input type="number" id="close-sellprice" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label>賣出日期</label>
+        <input type="date" id="close-selldate">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>賣出股數 <span id="close-shares-hint" style="font-size:11px;color:var(--gray-dark)"></span></label>
+      <input type="number" id="close-shares" min="1" placeholder="輸入股數">
+      <div style="display:flex;gap:6px;margin-top:5px">
+        <button class="btn btn-ghost btn-sm" onclick="setCloseSharesPct(25)">25%</button>
+        <button class="btn btn-ghost btn-sm" onclick="setCloseSharesPct(50)">50%</button>
+        <button class="btn btn-ghost btn-sm" onclick="setCloseSharesPct(75)">75%</button>
+        <button class="btn btn-ghost btn-sm" onclick="setCloseSharesPct(100)" style="color:var(--amber);font-weight:700">全倉</button>
+      </div>
+    </div>
+    <div id="close-preview" style="background:var(--gray);border-radius:6px;padding:8px;margin:10px 0;font-size:12px;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-amber" style="flex:1" onclick="confirmCloseTrade()">✅ 確認平倉</button>
+      <button class="btn btn-ghost" onclick="closeCloseModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== 加倉 MODAL ======== -->
+<div id="addModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:20px;width:380px;max-width:95vw">
+    <h3 style="margin-bottom:4px;color:var(--green)">➕ 加倉</h3>
+    <div id="add-trade-info" style="font-size:13px;color:var(--gray-dark);margin-bottom:14px"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label id="add-buyprice-lbl">加倉價格</label>
+        <input type="number" id="add-buyprice" step="0.01" placeholder="0.00" oninput="updateAddPreview()">
+      </div>
+      <div class="form-group">
+        <label>加倉日期</label>
+        <input type="date" id="add-buydate">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>加倉股數</label>
+      <input type="number" id="add-shares" min="1" placeholder="輸入股數" oninput="updateAddPreview()">
+    </div>
+    <div class="form-group">
+      <label>備注 (可選)</label>
+      <input type="text" id="add-note" placeholder="例：突破加倉、回調加碼...">
+    </div>
+    <div id="add-preview" style="background:var(--gray);border-radius:6px;padding:8px;margin:10px 0;font-size:12px;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-green" style="flex:1" onclick="confirmAddTrade()">✅ 確認加倉</button>
+      <button class="btn btn-ghost" onclick="closeAddModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">已保存</div>
+
+<script>
+// ============================================================
+// STATE & STORAGE
+// ============================================================
+let state = {
+  scores: {},          // { weekKey: { q1,q2,q3,q4, note, date } }
+  reviews: {},         // { weekKey: { pnl, trades, wins, violations, nextweek, checks } }
+  trades: [],          // array of trade objects
+  positions: [],       // array of open position objects
+  peakVal: 0, currVal: 0,
+  usdRate: 7.78,  // USD → HKD
+  jpyRate: 0.051, // JPY → HKD
+  krwRate: 0.0057, // KRW → HKD
+  bucketE: 0, bucketG: 0, bucketB: 0, bucketC: 0, bucketD: 0,
+  bucketA: 0, // legacy
+  currentPrices: {},   // { code: price }
+  currentScores: { q1: null, q2: null, q3: null, q4: null },
+  dailyNote: '',
+  dailyPerf: [],  // array of daily snapshots
+  qqqHistory: [], // accumulated QQQ daily prices for MA/RSI (auto-score)
+};
+
+function save() { localStorage.setItem('wilson_tracker', JSON.stringify(state)); }
+function load() {
+  const d = localStorage.getItem('wilson_tracker');
+  if (d) state = JSON.parse(d);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload = function() {
+  load();
+  updateHeaderDate();
+  restoreInputs();
+  calcDrawdown();
+  updateBuckets();
+  renderOpenPositions();
+  renderClosedTrades();
+  renderScoreHistory();
+  renderReviewHistory();
+  renderBucketPositions();
+  renderDashPnL();
+  renderClosedStats();
+  loadFinnhubKey();
+  loadJsonbinSettings();
+  dpInit();
+
+  // Set today's date for trade form
+  document.getElementById('t-buydate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pos-date').value = new Date().toISOString().split('T')[0];
+
+  // Set current week for review
+  const now = new Date();
+  const year = now.getFullYear();
+  const week = getWeekNumber(now);
+  document.getElementById('reviewWeek').value = `${year}-W${String(week).padStart(2,'0')}`;
+
+  // Load daily note
+  document.getElementById('dailyNote').value = state.dailyNote || '';
+};
+
+function updateHeaderDate() {
+  const now = new Date();
+  const days = ['日','一','二','三','四','五','六'];
+  document.getElementById('headerDate').textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 (週${days[now.getDay()]})`;
+  setTimeout(updateHeaderDate, 60000);
+}
+
+function restoreInputs() {
+  if (state.peakVal) document.getElementById('peakVal').value = state.peakVal;
+  if (state.currVal) document.getElementById('currVal').value = state.currVal;
+  document.getElementById('usdRate').value = state.usdRate || 7.78;
+  document.getElementById('jpyRate').value = state.jpyRate || 0.051;
+  document.getElementById('krwRate').value = state.krwRate || 0.0057;
+  if (state.bucketE) document.getElementById('bucketE').value = state.bucketE;
+  if (state.bucketG) document.getElementById('bucketG').value = state.bucketG;
+  if (state.bucketB) document.getElementById('bucketB').value = state.bucketB;
+  if (state.bucketC) document.getElementById('bucketC').value = state.bucketC;
+  if (state.bucketD) document.getElementById('bucketD').value = state.bucketD;
+}
+
+// ============================================================
+// SHORT-AWARE P&L HELPERS
+// ============================================================
+// For shorts: profit when price falls → direction is reversed
+function tradeDir(t) { return t.type === 'Short' ? -1 : 1; }
+function calcPnlPct(t, currPrice) {
+  if (!currPrice) return null;
+  return tradeDir(t) * (currPrice - t.buyprice) / t.buyprice * 100;
+}
+function calcPnlAmt(t, currPrice) {
+  if (!currPrice) return null;
+  return tradeDir(t) * (currPrice - t.buyprice) * t.shares;
+}
+function calcRetPct(t) {
+  if (!t.sellprice) return null;
+  return tradeDir(t) * (t.sellprice - t.buyprice) / t.buyprice * 100;
+}
+function calcPlAmt(t) {
+  if (!t.sellprice || !t.buyprice || !t.shares) return null;
+  return tradeDir(t) * (t.sellprice - t.buyprice) * t.shares;
+}
+
+// ============================================================
+// MULTI-CURRENCY HELPERS (HKD / USD / JPY / KRW)
+// ============================================================
+function getCurrency(code) {
+  const u = code.toUpperCase();
+  if (u.endsWith('.HK') || /^\d{4,5}$/.test(u)) return 'HKD'; // HK stocks
+  if (u.endsWith('.T'))                           return 'JPY'; // Japan (e.g. 7203.T)
+  if (u.endsWith('.KS') || u.endsWith('.KQ'))     return 'KRW'; // Korea
+  return 'USD'; // US stocks (default)
+}
+function toHKD(amount, code) {
+  const cur = getCurrency(code);
+  if (cur === 'HKD') return amount;
+  if (cur === 'JPY') return amount * (parseFloat(state.jpyRate) || 0.051);
+  if (cur === 'KRW') return amount * (parseFloat(state.krwRate) || 0.0057);
+  return amount * (parseFloat(state.usdRate) || 7.78); // USD
+}
+function getCurrencyLabel(code) {
+  const cur = getCurrency(code);
+  return { USD: 'US$', JPY: '¥', KRW: '₩', HKD: 'HK$' }[cur];
+}
+function saveAllRates() {
+  state.usdRate = parseFloat(document.getElementById('usdRate').value) || 7.78;
+  state.jpyRate = parseFloat(document.getElementById('jpyRate').value) || 0.051;
+  state.krwRate = parseFloat(document.getElementById('krwRate').value) || 0.0057;
+  save();
+  renderOpenPositions();
+  autoCalcBuckets();
+}
+async function fetchFxRates() {
+  const btn = document.getElementById('fetchRateBtn');
+  btn.textContent = '⏳';
+  try {
+    const finnhubKey = localStorage.getItem('finnhub_key') || '';
+    if (!finnhubKey) throw new Error('no key');
+    const r = await fetch(`https://finnhub.io/api/v1/forex/rates?base=USD&token=${finnhubKey}`, { signal: AbortSignal.timeout(6000) });
+    const d = await r.json();
+    const q = d.quote || {};
+    let updated = [];
+    if (q.HKD && q.HKD > 5) {
+      state.usdRate = parseFloat(q.HKD.toFixed(4));
+      document.getElementById('usdRate').value = state.usdRate;
+      updated.push(`USD=${state.usdRate}`);
+    }
+    if (q.JPY && q.JPY > 50) {
+      // Finnhub gives JPY per USD; we want HKD per JPY = HKD/JPY = (HKD/USD) / (JPY/USD)
+      state.jpyRate = parseFloat((q.HKD / q.JPY).toFixed(5));
+      document.getElementById('jpyRate').value = state.jpyRate;
+      updated.push(`JPY=${state.jpyRate}`);
+    }
+    if (q.KRW && q.KRW > 500) {
+      state.krwRate = parseFloat((q.HKD / q.KRW).toFixed(6));
+      document.getElementById('krwRate').value = state.krwRate;
+      updated.push(`KRW=${state.krwRate}`);
+    }
+    if (!updated.length) throw new Error('no rates');
+    save(); renderOpenPositions(); autoCalcBuckets();
+    showToast(`匯率已更新：${updated.join(' · ')} ✅`);
+  } catch {
+    showToast('自動抓取失敗，請手動輸入匯率', true);
+  }
+  btn.textContent = '🔄';
+}
+
+// ============================================================
+// TAB NAVIGATION
+// ============================================================
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ============================================================
+// SCORE SYSTEM
+// ============================================================
+function setScore(q, val, btn) {
+  state.currentScores[q] = val;
+  const row = btn.closest('.score-row');
+  row.querySelectorAll('.score-btn').forEach(b => {
+    b.className = 'score-btn';
+    if (parseInt(b.textContent) === val) b.classList.add(`selected-${val}`);
+  });
+  updateScoreDisplay();
+}
+
+function updateScoreDisplay() {
+  const s = state.currentScores;
+  const vals = [s.q1, s.q2, s.q3, s.q4];
+  const total = vals.filter(v => v !== null).reduce((a, b) => a + b, 0);
+  const allSet = vals.every(v => v !== null);
+
+  document.getElementById('totalScore').textContent = total;
+  document.getElementById('dash-score').textContent = allSet ? total : '?';
+
+  const modes = [
+    { min: 0, max: 2, name: '休息模式', cls: 'mode-rest', stocks: '0-2隻', lev: '0x', detail: '市場環境惡劣。最多保留A桶核心股，B桶全部清空。不開任何新倉。' },
+    { min: 3, max: 4, name: '防守模式', cls: 'mode-defend', stocks: '4-6隻', lev: '0x', detail: '謹慎操作。縮減B桶至4-6隻，保護A桶持倉。不加槓桿。' },
+    { min: 5, max: 6, name: '平衡模式', cls: 'mode-balance', stocks: '8-10隻', lev: '1.0x', detail: '正常操作。B桶可持8-10隻，不加槓桿。繼續監察市場。' },
+    { min: 7, max: 8, name: '進攻模式', cls: 'mode-attack', stocks: '12-15隻', lev: '≤1.2x', detail: '積極進取。A桶可滿配，B桶最多15隻。可適量槓桿（≤1.2x）。' },
+  ];
+
+  const mode = modes.find(m => total >= m.min && total <= m.max) || modes[0];
+  document.getElementById('modeDisplay').innerHTML = `<span class="mode-badge ${mode.cls}">${mode.name}</span>`;
+  document.getElementById('dash-mode').textContent = mode.name;
+  document.getElementById('dash-mode-sub').textContent = mode.name;
+  document.getElementById('dash-stocks-limit').textContent = `最多${mode.stocks} · 槓桿${mode.lev}`;
+
+  if (allSet) {
+    document.getElementById('modeDetail').style.display = 'block';
+    document.getElementById('modeTitle').textContent = `本週操作：${mode.name}`;
+    document.getElementById('modeRules').textContent = mode.detail;
+    updateAlerts(total, mode);
+  }
+}
+
+function updateAlerts(score, mode) {
+  const zone = document.getElementById('alertZone');
+  let html = '';
+  const dd = state.peakVal && state.currVal ? (state.currVal - state.peakVal) / state.peakVal * 100 : 0;
+
+  if (dd <= -25) html += `<div class="alert-box alert-danger">🚨 緊急熔斷！回撤已達${dd.toFixed(1)}% → 立即全部清倉，100%現金，強制休息2週！</div>`;
+  else if (dd <= -20) html += `<div class="alert-box alert-danger">⛔ 嚴重熔斷 ${dd.toFixed(1)}% → A桶剩1隻，現金≥50%，不可任何買入！</div>`;
+  else if (dd <= -15) html += `<div class="alert-box alert-warn">⚠️ 熔斷-15% → A桶減至2隻，B桶全清，立即去槓桿！</div>`;
+  else if (dd <= -10) html += `<div class="alert-box alert-warn">⚠️ 回撤-10% → 停止B桶新倉，檢視所有持倉！</div>`;
+
+  if (score <= 2) html += `<div class="alert-box alert-danger">🔴 市場評分 ${score}/8 — 休息模式：不可開任何新倉</div>`;
+  else if (score <= 4) html += `<div class="alert-box alert-warn">🟠 市場評分 ${score}/8 — 防守模式：縮減持倉</div>`;
+  else html += `<div class="alert-box alert-ok">🟢 市場評分 ${score}/8 — ${mode.name}</div>`;
+
+  zone.innerHTML = html;
+}
+
+function saveWeeklyScore() {
+  const s = state.currentScores;
+  if ([s.q1, s.q2, s.q3, s.q4].some(v => v === null)) {
+    showToast('請完成所有評分項目！', true); return;
+  }
+  const total = s.q1 + s.q2 + s.q3 + s.q4;
+  const now = new Date();
+  const week = `${now.getFullYear()}-W${String(getWeekNumber(now)).padStart(2,'0')}`;
+  state.scores[week] = { ...s, total, note: document.getElementById('scoreNote').value, date: now.toISOString().slice(0,10) };
+  save(); renderScoreHistory(); showToast('本週評分已保存 ✅');
+}
+
+function setScoreAuto(q, val) {
+  state.currentScores[q] = val;
+  // find the score-row containing a button with onclick="setScore('${q}',..."
+  document.querySelectorAll('.score-row').forEach(row => {
+    const btns = row.querySelectorAll('.score-btn');
+    if (!btns.length) return;
+    const first = btns[0].getAttribute('onclick') || '';
+    if (!first.includes(`'${q}'`)) return;
+    btns.forEach(b => {
+      b.className = 'score-btn';
+      if (parseInt(b.textContent) === val) b.classList.add(`selected-${val}`);
+    });
+  });
+}
+
+async function autoScore() {
+  const key = localStorage.getItem('finnhub_key') || '';
+  if (!key) { showToast('請先在設定中填入 Finnhub API Key', true); return; }
+  const btn = document.getElementById('autoScoreBtn');
+  const statusEl = document.getElementById('autoScoreStatus');
+  btn.disabled = true; btn.textContent = '⏳ 抓取中...';
+  statusEl.style.display = 'block'; statusEl.style.color = 'var(--gray-dark)';
+  statusEl.textContent = '正在抓取 QQQ 報價 (Finnhub)...';
+
+  const lines = [];
+
+  try {
+    // ── Fetch QQQ quote via Finnhub (confirmed working from file://) ──
+    const qR = await fetch(`https://finnhub.io/api/v1/quote?symbol=QQQ&token=${key}`,
+      { signal: AbortSignal.timeout(8000) });
+    if (!qR.ok) throw new Error(`QQQ HTTP ${qR.status}`);
+    const q = await qR.json();
+    if (!q.c || q.c <= 0) throw new Error('QQQ 報價無效');
+    const cur = q.c;
+
+    // ── Accumulate QQQ price history in localStorage ──
+    if (!state.qqqHistory) state.qqqHistory = [];
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.qqqHistory.find(h => h.d === today)) {
+      state.qqqHistory.push({ d: today, c: cur });
+      state.qqqHistory.sort((a, b) => a.d.localeCompare(b.d));
+      if (state.qqqHistory.length > 260) state.qqqHistory = state.qqqHistory.slice(-260);
+      save();
+    }
+    const closes = state.qqqHistory.map(h => h.c);
+    const days = closes.length;
+
+    // ── Q1: QQQ vs MA50 / MA200 ──
+    if (days >= 200) {
+      const ma50  = closes.slice(-50).reduce((a,b)=>a+b,0) / 50;
+      const ma200 = closes.slice(-200).reduce((a,b)=>a+b,0) / 200;
+      const score = cur >= ma50 ? 2 : cur >= ma200 ? 1 : 0;
+      setScoreAuto('q1', score);
+      lines.push(`① 納指：QQQ $${cur.toFixed(1)} | MA50 $${ma50.toFixed(1)} | MA200 $${ma200.toFixed(1)} → <strong>${score}分</strong>`);
+    } else if (days >= 55) {
+      const ma50 = closes.slice(-50).reduce((a,b)=>a+b,0) / 50;
+      const score = cur >= ma50 ? 2 : 1;
+      setScoreAuto('q1', score);
+      lines.push(`① 納指：QQQ $${cur.toFixed(1)} | MA50 $${ma50.toFixed(1)} → <strong>${score}分</strong> <span style="color:#999;font-size:10px">(數據積累中 ${days}/200，${200-days}週後可計算MA200)</span>`);
+    } else {
+      lines.push(`① 納指：數據積累中 (${days}/55週) → <strong>請手動填寫</strong>`);
+    }
+
+    // ── Q2: 21-day realized vol as VIX proxy (from accumulated history) ──
+    if (days >= 22) {
+      const recent = closes.slice(-22);
+      const logRets = [];
+      for (let i = 1; i < recent.length; i++) logRets.push(Math.log(recent[i] / recent[i-1]));
+      const mean = logRets.reduce((a,b)=>a+b,0) / logRets.length;
+      const variance = logRets.reduce((a,b)=>a+(b-mean)**2,0) / logRets.length;
+      const rv = Math.sqrt(variance * 252) * 100;
+      const score = rv < 15 ? 2 : rv <= 25 ? 1 : 0;
+      setScoreAuto('q2', score);
+      lines.push(`② 波幅(年化已實現)：${rv.toFixed(1)}% → <strong>${score}分</strong> <span style="color:#999;font-size:10px">(&lt;15%=低, 15-25%=中, &gt;25%=高)</span>`);
+    } else {
+      lines.push(`② 波幅：數據積累中 (${days}/22週) → <strong>請手動填寫</strong>`);
+    }
+
+    // ── Q4: RSI-14 ──
+    if (days >= 15) {
+      let gains = 0, losses = 0;
+      for (let i = closes.length - 14; i < closes.length; i++) {
+        const d = closes[i] - closes[i - 1];
+        if (d > 0) gains += d; else losses -= d;
+      }
+      const rs = losses === 0 ? 999 : gains / losses;
+      const rsi = 100 - 100 / (1 + rs);
+      const score = rsi > 60 ? 2 : rsi >= 45 ? 1 : 0;
+      setScoreAuto('q4', score);
+      lines.push(`④ 市場強度(RSI-14)：${rsi.toFixed(1)} → <strong>${score}分</strong>`);
+    } else {
+      lines.push(`④ 市場強度：數據積累中 (${days}/15週) → <strong>請手動填寫</strong>`);
+    }
+
+    // ── Q3: Portfolio momentum from dailyPerf ──
+    const perf = state.dailyPerf ? [...state.dailyPerf].sort((a,b)=>b.date.localeCompare(a.date)) : [];
+    const latest = perf.find(r => r.total > 0);
+    if (latest && perf.length >= 2) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
+      const old = perf.find(r => r.date <= cutoff.toISOString().slice(0,10) && r.total > 0)
+                  || perf.filter(r => r.total > 0).pop();
+      if (old && old.date !== latest.date) {
+        const ret = (latest.total - old.total) / old.total * 100;
+        const score = ret > 0.5 ? 2 : ret >= -0.5 ? 1 : 0;
+        setScoreAuto('q3', score);
+        lines.push(`③ 組合動能：${old.date}→${latest.date} 回報 ${ret >= 0 ? '+' : ''}${ret.toFixed(1)}% → <strong>${score}分</strong>`);
+      } else {
+        lines.push('③ 組合動能：記錄不足，請手動填寫');
+      }
+    } else {
+      lines.push('③ 組合動能：無每日表現記錄，請手動填寫');
+    }
+
+    updateScoreDisplay();
+    statusEl.innerHTML = lines.map(l => `<div style="margin-bottom:3px">${l}</div>`).join('');
+    statusEl.style.color = 'var(--blue)';
+
+  } catch(e) {
+    console.error('[autoScore] error:', e);
+    statusEl.innerHTML = `❌ 抓取失敗：${e.message}`;
+    statusEl.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 自動評分';
+  }
+}
+
+// ============================================================
+// DRAWDOWN
+// ============================================================
+function calcDrawdown() {
+  const peak = parseFloat(document.getElementById('peakVal').value) || 0;
+  const curr = parseFloat(document.getElementById('currVal').value) || 0;
+  state.peakVal = peak; state.currVal = curr; save();
+  updateBuckets();
+
+  if (!peak || !curr) return;
+  const dd = (curr - peak) / peak * 100;
+  const ddEl = document.getElementById('dash-dd');
+  ddEl.textContent = dd.toFixed(1) + '%';
+
+  const box = document.getElementById('dash-dd-box');
+  box.className = 'stat-box';
+  if (dd <= -20) { box.classList.add('stat-red'); }
+  else if (dd <= -10) { box.classList.add('stat-amber'); }
+  else { box.classList.add('stat-green'); }
+
+  // Needle position (0% = 0 dd, 100% = -30% dd)
+  const needlePct = Math.min(100, Math.max(0, Math.abs(dd) / 30 * 100));
+  document.getElementById('ddNeedle').style.left = needlePct + '%';
+
+  // Circuit status
+  let statusHtml = '';
+  if (dd <= -25) statusHtml = `<div class="alert-box alert-danger">🚨 緊急熔斷 ${dd.toFixed(1)}%！全部清倉，現金，強制休息2週</div>`;
+  else if (dd <= -20) statusHtml = `<div class="alert-box alert-danger">⛔ 嚴重回撤 ${dd.toFixed(1)}%！A桶剩1隻，現金≥50%</div>`;
+  else if (dd <= -15) statusHtml = `<div class="alert-box alert-warn">⚠️ 熔斷-15% (現${dd.toFixed(1)}%)：A桶減至2隻，B桶全清</div>`;
+  else if (dd <= -10) statusHtml = `<div class="alert-box alert-warn">⚠️ 回撤-10% (現${dd.toFixed(1)}%)：停止B桶新倉</div>`;
+  else statusHtml = `<div class="alert-box alert-ok">✅ 正常範圍 (${dd.toFixed(1)}%)：無熔斷觸發</div>`;
+  document.getElementById('circuitStatus').innerHTML = statusHtml;
+  updateAlerts(state.currentScores.q1 !== null ? Object.values(state.currentScores).reduce((a,b)=>a+(b||0),0) : 0, {name:'—'});
+}
+
+function updateBuckets() {
+  const e = parseFloat(document.getElementById('bucketE').value) || 0;
+  const g = parseFloat(document.getElementById('bucketG').value) || 0;
+  const b = parseFloat(document.getElementById('bucketB').value) || 0;
+  const c = parseFloat(document.getElementById('bucketC').value) || 0;
+  const d = parseFloat(document.getElementById('bucketD').value) || 0;
+  state.bucketE = e; state.bucketG = g; state.bucketB = b; state.bucketC = c; state.bucketD = d; save();
+
+  const total = e + g + b + c + d || 1;
+  const ep = e/total*100, gp = g/total*100, bp2 = b/total*100, cp = c/total*100, dp = d/total*100;
+  document.getElementById('bucket-e-pct').textContent = ep.toFixed(0) + '%';
+  document.getElementById('bucket-g-pct').textContent = gp.toFixed(0) + '%';
+  document.getElementById('bucket-b-pct').textContent = bp2.toFixed(0) + '%';
+  document.getElementById('bucket-c-pct').textContent = cp.toFixed(0) + '%';
+  document.getElementById('bucket-d-pct').textContent = dp.toFixed(1) + '%';
+  document.getElementById('bar-e').style.width = Math.min(100, ep/35*100) + '%';
+  document.getElementById('bar-g').style.width = Math.min(100, gp/25*100) + '%';
+  document.getElementById('bar-b').style.width = Math.min(100, bp2/20*100) + '%';
+  document.getElementById('bar-c').style.width = Math.min(100, cp/15*100) + '%';
+  document.getElementById('bar-d').style.width = Math.min(100, dp/5*100) + '%';
+  document.getElementById('cBucketDisplay').textContent = c.toLocaleString();
+  document.getElementById('cBucketPctDisplay').textContent = cp.toFixed(1) + '% 佔組合';
+  const dWarn = dp > 5;
+  document.getElementById('bucket-d-warn').style.display = dWarn ? 'block' : 'none';
+  const dWarnCard = document.getElementById('bucketDWarnCard');
+  if (dWarnCard) dWarnCard.style.display = dWarn ? 'block' : 'none';
+}
+
+// ============================================================
+// AUTO-CALC BUCKETS FROM OPEN POSITIONS
+// ============================================================
+function autoCalcBuckets() {
+  const open = state.trades.filter(t => t.status === 'open');
+  const totals = { E: 0, G: 0, B: 0, D: 0 };
+  const counts = { E: 0, G: 0, B: 0, D: 0 };
+  const hasPx  = { E: false, G: false, B: false, D: false };
+
+  open.forEach(t => {
+    const bucket = t.bucket === 'A' ? 'G' : t.bucket; // legacy A → G
+    if (!totals.hasOwnProperty(bucket)) return;
+    const rawPx = (bucket === 'D')
+      ? t.buyprice   // D桶 always use cost basis
+      : (state.currentPrices && state.currentPrices[t.code]) || t.buyprice;
+    const usedCurrentPx = bucket !== 'D' && state.currentPrices && state.currentPrices[t.code];
+    if (usedCurrentPx) hasPx[bucket] = true;
+    const posVal = (t.shares || 0) * rawPx;
+    totals[bucket] += toHKD(posVal, t.code);  // convert USD→HKD if needed
+    counts[bucket]++;
+  });
+
+  // Fill inputs & hints
+  ['E','G','B','D'].forEach(b => {
+    const val = Math.round(totals[b]);
+    document.getElementById(`bucket${b}`).value = val || '';
+    const hintEl = document.getElementById(`bucket${b}-hint`);
+    if (hintEl) {
+      if (counts[b] === 0) {
+        hintEl.textContent = '無持倉';
+      } else if (b === 'D') {
+        hintEl.textContent = `${counts[b]}倉 · 原始成本 (HKD)`;
+      } else {
+        hintEl.textContent = `${counts[b]}倉 · ${hasPx[b] ? '現價' : '買入價'} (HKD)`;
+      }
+    }
+  });
+
+  updateBuckets();
+
+  // Also update currVal = sum of all buckets (positions + existing cash)
+  const c = parseFloat(document.getElementById('bucketC').value) || 0;
+  const autoTotal = totals.E + totals.G + totals.B + totals.D + c;
+  document.getElementById('currVal').value = Math.round(autoTotal);
+  state.currVal = Math.round(autoTotal);
+  save(); calcDrawdown();
+
+  const note = document.getElementById('autocalc-note');
+  const ts = new Date().toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' });
+  note.textContent = `已更新 ${ts}，現值 ${Math.round(autoTotal).toLocaleString()}`;
+}
+
+// ============================================================
+// DAILY CHECKLIST
+// ============================================================
+function toggleCheck(item) {
+  const cb = item.querySelector('input[type=checkbox]');
+  cb.checked = !cb.checked;
+  item.classList.toggle('checked', cb.checked);
+  const total = document.querySelectorAll('#dailyChecklist .check-item').length;
+  const done = document.querySelectorAll('#dailyChecklist .check-item.checked').length;
+  document.getElementById('checkCount').textContent = `${done}/${total} 完成`;
+}
+function resetChecklist() {
+  document.querySelectorAll('#dailyChecklist .check-item').forEach(item => {
+    item.classList.remove('checked');
+    item.querySelector('input').checked = false;
+  });
+  document.getElementById('checkCount').textContent = '0/5 完成';
+}
+function saveNote() {
+  state.dailyNote = document.getElementById('dailyNote').value;
+  save();
+  document.getElementById('noteSavedMsg').textContent = '已自動儲存 ' + new Date().toLocaleTimeString();
+}
+
+// ============================================================
+// TRADES
+// ============================================================
+// Dynamically update price field labels based on stock code currency
+function updatePriceLabels() {
+  const code = document.getElementById('t-code').value.trim();
+  if (!code) {
+    document.getElementById('lbl-buyprice').textContent = '買入價';
+    document.getElementById('lbl-stop').textContent = '止蝕位';
+    document.getElementById('lbl-target').textContent = '目標價 (可選)';
+    return;
+  }
+  const cur = getCurrency(code);
+  const sym = getCurrencyLabel(code);
+  const flagMap = { USD: '🇺🇸', JPY: '🇯🇵', KRW: '🇰🇷', HKD: '🇭🇰' };
+  const flag = flagMap[cur] || '';
+  document.getElementById('lbl-buyprice').textContent = `買入價 (${cur} ${sym}) ${flag}`;
+  document.getElementById('lbl-stop').textContent = `止蝕位 (${sym})`;
+  document.getElementById('lbl-target').textContent = `目標價 (${sym})`;
+}
+
+function addTrade() {
+  const code = document.getElementById('t-code').value.trim().toUpperCase();
+  const bucket = document.getElementById('t-bucket').value;
+  const type = document.getElementById('t-type').value;
+  const buydate = document.getElementById('t-buydate').value;
+  const buyprice = parseFloat(document.getElementById('t-buyprice').value);
+  const shares = parseFloat(document.getElementById('t-shares').value);
+  const stop = parseFloat(document.getElementById('t-stop').value) || 0;
+  const target = parseFloat(document.getElementById('t-target').value) || 0;
+  const sector = document.getElementById('t-sector').value;
+  const note = document.getElementById('t-note').value;
+
+  if (!code || !buydate || !buyprice || !shares) { showToast('請填寫必要欄位！', true); return; }
+
+  const sizeWarn = checkPositionSizeWarning(bucket, shares, buyprice);
+  if (sizeWarn && !confirm(sizeWarn)) return;
+
+  const trade = { id: Date.now(), code, bucket, type, buydate, buyprice, shares, stop, target, sector, note, status: 'open', selldate: null, sellprice: null };
+  state.trades.push(trade);
+  state.positions.push({ ...trade });
+  save();
+  renderOpenPositions();
+  renderClosedTrades();
+  renderBucketPositions();
+  updateDashPositions();
+  showToast(`${code} 已加入記錄 ✅`);
+
+  // Clear form
+  ['t-code','t-buyprice','t-shares','t-stop','t-target','t-sector','t-note'].forEach(id => document.getElementById(id).value = '');
+}
+
+let _closeId = null;
+function closeTrade(id) {
+  const t = state.trades.find(t => t.id === id);
+  if (!t) return;
+  _closeId = id;
+  const cur3 = getCurrency(t.code);
+  const sym = getCurrencyLabel(t.code);
+  const flagMap = { USD: '🇺🇸', JPY: '🇯🇵', KRW: '🇰🇷', HKD: '🇭🇰' };
+  document.getElementById('close-trade-info').innerHTML =
+    `<strong>${t.code}</strong> · ${t.bucket}桶 · 買入 ${t.buyprice} ${sym} × ${t.shares} 股`;
+  document.getElementById('close-sellprice-lbl').textContent = `賣出價 (${cur3} ${sym}) ${flagMap[cur3]||''}`;
+  document.getElementById('close-sellprice').value = '';
+  document.getElementById('close-selldate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('close-shares').value = t.shares;
+  document.getElementById('close-shares-hint').textContent = `(持有 ${t.shares} 股)`;
+  document.getElementById('close-preview').style.display = 'none';
+  document.getElementById('closeModal').style.display = 'flex';
+  // live preview on input
+  ['close-sellprice','close-shares'].forEach(elId => {
+    document.getElementById(elId).oninput = updateClosePreview;
+  });
+}
+function setCloseSharesPct(pct) {
+  const t = state.trades.find(t => t.id === _closeId);
+  if (!t) return;
+  document.getElementById('close-shares').value = Math.round(t.shares * pct / 100);
+  updateClosePreview();
+}
+function updateClosePreview() {
+  const t = state.trades.find(t => t.id === _closeId);
+  if (!t) return;
+  const sellprice = parseFloat(document.getElementById('close-sellprice').value);
+  const sellShares = parseFloat(document.getElementById('close-shares').value);
+  const el = document.getElementById('close-preview');
+  if (!sellprice || !sellShares) { el.style.display = 'none'; return; }
+  const rawPL = calcPlAmtCustom(t, sellprice, sellShares);
+  const plHKD = toHKD(rawPL, t.code);
+  const retPct = (tradeDir(t) * (sellprice - t.buyprice) / t.buyprice * 100).toFixed(1);
+  const remaining = t.shares - sellShares;
+  const isPartial = remaining > 0;
+  const color = plHKD >= 0 ? 'var(--green)' : 'var(--red)';
+  el.style.display = 'block';
+  el.innerHTML = `
+    回報：<strong style="color:${color}">${retPct > 0 ? '+' : ''}${retPct}%</strong>
+    &nbsp;·&nbsp; P&L：<strong style="color:${color}">${plHKD >= 0 ? '+' : ''}HK$${Math.round(plHKD).toLocaleString()}</strong>
+    ${isPartial ? `&nbsp;·&nbsp; 剩餘持倉：<strong>${remaining} 股</strong>` : '&nbsp;·&nbsp; <strong>全倉平倉</strong>'}
+  `;
+}
+function calcPlAmtCustom(t, sellprice, shares) {
+  return tradeDir(t) * (sellprice - t.buyprice) * shares;
+}
+function closeCloseModal() {
+  document.getElementById('closeModal').style.display = 'none';
+  _closeId = null;
+}
+
+// ── 加倉 ──
+let _addId = null;
+function addToTrade(id) {
+  const t = state.trades.find(t => t.id === id);
+  if (!t) return;
+  _addId = id;
+  const sym = getCurrencyLabel(t.code);
+  document.getElementById('add-trade-info').innerHTML =
+    `<strong>${t.code}</strong> · ${t.bucket}桶 · 現有 ${t.shares} 股 @ ${t.buyprice} ${sym}`;
+  document.getElementById('add-buyprice-lbl').textContent = `加倉價格 (${sym})`;
+  document.getElementById('add-buyprice').value = '';
+  document.getElementById('add-shares').value = '';
+  document.getElementById('add-note').value = '';
+  document.getElementById('add-buydate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('add-preview').style.display = 'none';
+  document.getElementById('addModal').style.display = 'flex';
+}
+function updateAddPreview() {
+  const t = state.trades.find(t => t.id === _addId);
+  if (!t) return;
+  const newPrice = parseFloat(document.getElementById('add-buyprice').value);
+  const newShares = parseFloat(document.getElementById('add-shares').value);
+  const el = document.getElementById('add-preview');
+  if (!newPrice || !newShares) { el.style.display = 'none'; return; }
+  const totalShares = t.shares + newShares;
+  const avgPrice = (t.buyprice * t.shares + newPrice * newShares) / totalShares;
+  const costHKD = toHKD(newPrice * newShares, t.code);
+  el.style.display = 'block';
+  el.innerHTML = `新增成本：<strong>HK$${Math.round(costHKD).toLocaleString()}</strong>
+    &nbsp;·&nbsp; 加倉後持股：<strong>${totalShares} 股</strong>
+    &nbsp;·&nbsp; 平均成本：<strong>${avgPrice.toFixed(3)}</strong>`;
+}
+function closeAddModal() {
+  document.getElementById('addModal').style.display = 'none';
+  _addId = null;
+}
+function confirmAddTrade() {
+  if (!_addId) return;
+  const t = state.trades.find(t => t.id === _addId);
+  if (!t) return;
+  const newPrice = parseFloat(document.getElementById('add-buyprice').value);
+  const newShares = parseFloat(document.getElementById('add-shares').value);
+  const newDate  = document.getElementById('add-buydate').value || new Date().toISOString().split('T')[0];
+  const note     = document.getElementById('add-note').value.trim();
+  if (!newPrice || newPrice <= 0) { showToast('請輸入加倉價格', true); return; }
+  if (!newShares || newShares <= 0) { showToast('請輸入加倉股數', true); return; }
+  // Create a separate open trade record for the new lot
+  const newTrade = {
+    id: Date.now(),
+    code: t.code, bucket: t.bucket, type: t.type,
+    buydate: newDate, buyprice: newPrice, shares: newShares,
+    stop: t.stop, target: t.target, sector: t.sector,
+    note: note ? `加倉 (原倉 ${t.buydate}@${t.buyprice}) ${note}` : `加倉 (原倉 ${t.buydate}@${t.buyprice})`,
+    status: 'open'
+  };
+  state.trades.push(newTrade);
+  state.positions.push({ ...newTrade });
+  save();
+  closeAddModal();
+  renderOpenPositions(); renderClosedTrades(); renderBucketPositions(); updateDashPositions();
+  showToast(`${t.code} 加倉 ${newShares} 股 @ ${newPrice} ✅`);
+}
+function confirmCloseTrade() {
+  if (!_closeId) return;
+  const t = state.trades.find(t => t.id === _closeId);
+  if (!t) return;
+  const sellprice = parseFloat(document.getElementById('close-sellprice').value);
+  const sellShares = parseFloat(document.getElementById('close-shares').value);
+  const selldate = document.getElementById('close-selldate').value || new Date().toISOString().split('T')[0];
+  if (!sellprice || sellprice <= 0) { showToast('請輸入賣出價', true); return; }
+  if (!sellShares || sellShares <= 0 || sellShares > t.shares) { showToast(`股數不正確 (最多 ${t.shares} 股)`, true); return; }
+  const isPartial = sellShares < t.shares;
+  if (isPartial) {
+    // Create a new CLOSED record for the sold portion
+    const closedRecord = {
+      ...t,
+      id: Date.now(),
+      shares: sellShares,
+      status: 'closed',
+      sellprice,
+      selldate,
+      note: (t.note ? t.note + ' | ' : '') + `部分平倉 ${sellShares}/${t.shares}股`
+    };
+    state.trades.push(closedRecord);
+    // Reduce remaining shares on the original open position
+    const idx = state.trades.findIndex(tr => tr.id === _closeId);
+    if (idx >= 0) state.trades[idx].shares -= sellShares;
+    const pi = state.positions.findIndex(p => p.id === _closeId);
+    if (pi >= 0) state.positions[pi].shares -= sellShares;
+    showToast(`${t.code} 部分平倉 ${sellShares} 股 ✅`);
+  } else {
+    // Full close
+    const idx = state.trades.findIndex(tr => tr.id === _closeId);
+    if (idx >= 0) {
+      state.trades[idx].status = 'closed';
+      state.trades[idx].sellprice = sellprice;
+      state.trades[idx].selldate = selldate;
+    }
+    state.positions = state.positions.filter(p => p.id !== _closeId);
+    showToast(`${t.code} 全倉平倉 ✅`);
+  }
+  save(); closeCloseModal();
+  renderOpenPositions(); renderClosedTrades(); renderBucketPositions(); updateDashPositions();
+}
+
+function deleteTrade(id) {
+  if (!confirm('確定刪除此持倉記錄？')) return;
+  state.trades = state.trades.filter(t => t.id !== id);
+  state.positions = state.positions.filter(p => p.id !== id);
+  save();
+  renderOpenPositions(); renderClosedTrades(); renderBucketPositions(); updateDashPositions();
+}
+function deleteClosedTrade(id) {
+  const t = state.trades.find(t => t.id === id);
+  if (!t) return;
+  const retPctVal = calcRetPct(t);
+  const retStr = retPctVal !== null ? ` (${retPctVal > 0 ? '+' : ''}${retPctVal.toFixed(1)}%)` : '';
+  if (!confirm(`確定刪除 ${t.code} 已平倉記錄${retStr}？此操作不可復原。`)) return;
+  state.trades = state.trades.filter(tr => tr.id !== id);
+  save();
+  renderClosedTrades(); renderClosedStats();
+  showToast(`${t.code} 平倉記錄已刪除`);
+}
+
+function updateDashPositions() {
+  const open = state.trades.filter(t => t.status === 'open');
+  document.getElementById('dash-positions').textContent = open.length;
+  renderBucketPositions();
+}
+
+// Sort state for tables
+let openSort = { col: 'buydate', dir: 1 };
+let closedSort = { col: 'selldate', dir: -1 };
+let closedTradesPage = 0;
+const CLOSED_PAGE_SIZE = 100;
+
+function sortTh(col, tableId) {
+  if (tableId === 'open') {
+    if (openSort.col === col) openSort.dir *= -1; else { openSort.col = col; openSort.dir = 1; }
+    renderOpenPositions();
+  } else {
+    if (closedSort.col === col) closedSort.dir *= -1; else { closedSort.col = col; closedSort.dir = 1; }
+    closedTradesPage = 0;
+    renderClosedTrades();
+  }
+}
+
+function sortArrow(col, tableId) {
+  const s = tableId === 'open' ? openSort : closedSort;
+  if (s.col !== col) return '<span style="opacity:0.3;font-size:10px"> ⇅</span>';
+  return s.dir === 1 ? '<span style="font-size:10px"> ▲</span>' : '<span style="font-size:10px"> ▼</span>';
+}
+
+function thSort(label, col, tableId) {
+  return `<th style="cursor:pointer;user-select:none" onclick="sortTh('${col}','${tableId}')">${label}${sortArrow(col, tableId)}</th>`;
+}
+
+function sortTrades(arr, s) {
+  // Pre-calculate total for weight sorting
+  const totalHKD = s.col === 'weight' ? arr.reduce((sum, t) => {
+    const px = state.currentPrices[t.code] || t.buyprice;
+    return sum + toHKD(px * Math.abs(t.shares), t.code);
+  }, 0) : 0;
+
+  return [...arr].sort((a, b) => {
+    let va = a[s.col], vb = b[s.col];
+    if (s.col === 'pnlPct') {
+      va = calcPnlPct(a, state.currentPrices[a.code]) ?? -9999;
+      vb = calcPnlPct(b, state.currentPrices[b.code]) ?? -9999;
+    }
+    if (s.col === 'pnlAmt') {
+      const ra = calcPnlAmt(a, state.currentPrices[a.code]);
+      const rb = calcPnlAmt(b, state.currentPrices[b.code]);
+      va = ra !== null ? toHKD(ra, a.code) : -9999999;
+      vb = rb !== null ? toHKD(rb, b.code) : -9999999;
+    }
+    if (s.col === 'weight') {
+      const pxa = state.currentPrices[a.code] || a.buyprice;
+      const pxb = state.currentPrices[b.code] || b.buyprice;
+      va = totalHKD > 0 ? toHKD(pxa * Math.abs(a.shares), a.code) / totalHKD : 0;
+      vb = totalHKD > 0 ? toHKD(pxb * Math.abs(b.shares), b.code) / totalHKD : 0;
+    }
+    if (s.col === 'days') {
+      va = a.buydate ? (new Date() - new Date(a.buydate)) : 0;
+      vb = b.buydate ? (new Date() - new Date(b.buydate)) : 0;
+    }
+    if (s.col === 'retPct') {
+      va = calcRetPct(a) ?? -9999;
+      vb = calcRetPct(b) ?? -9999;
+    }
+    if (s.col === 'plHKD') {
+      const ra = calcPlAmt(a); const rb = calcPlAmt(b);
+      va = ra !== null ? toHKD(ra, a.code) : -9999999;
+      vb = rb !== null ? toHKD(rb, b.code) : -9999999;
+    }
+    if (s.col === 'isWin') {
+      va = (calcRetPct(a) ?? 0) > 0 ? 1 : 0;
+      vb = (calcRetPct(b) ?? 0) > 0 ? 1 : 0;
+    }
+    if (typeof va === 'string') return va.localeCompare(vb) * s.dir;
+    return ((va || 0) - (vb || 0)) * s.dir;
+  });
+}
+
+function renderOpenPositions() {
+  const open = state.trades.filter(t => t.status === 'open');
+  const el = document.getElementById('openPositions');
+  if (!open.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉記錄</div>'; renderDashPnL(); return; }
+  const sorted = sortTrades(open, openSort);
+  const tid = 'open';
+
+  // Calculate total open position value in HKD (using current price if available, else cost)
+  const totalHKD = open.reduce((sum, t) => {
+    const px = state.currentPrices[t.code] || t.buyprice;
+    return sum + toHKD(px * Math.abs(t.shares), t.code);
+  }, 0);
+
+  let html = `<table class="tbl"><tr>
+    ${thSort('股票','code',tid)}${thSort('桶','bucket',tid)}${thSort('類型','type',tid)}
+    ${thSort('買入日','buydate',tid)}${thSort('持倉日','days',tid)}
+    ${thSort('買入價','buyprice',tid)}${thSort('股數','shares',tid)}
+    <th style="background:#1a3a5c">現價</th>
+    <th style="background:#1a3a5c;cursor:pointer;user-select:none" onclick="sortTh('pnlPct','open')">盈虧%${sortArrow('pnlPct',tid)}</th>
+    <th style="background:#1a3a5c;cursor:pointer;user-select:none" onclick="sortTh('pnlAmt','open')">浮動金額${sortArrow('pnlAmt',tid)}</th>
+    <th style="background:#1a3a5c;cursor:pointer;user-select:none;white-space:nowrap" onclick="sortTh('weight','open')">佔比%${sortArrow('weight',tid)}</th>
+    ${thSort('止蝕','stop',tid)}${thSort('目標','target',tid)}<th>操作</th></tr>`;
+  sorted.forEach(t => {
+    const curr = state.currentPrices[t.code] || null;
+    const stopPct = t.stop ? (tradeDir(t) * (t.stop - t.buyprice) / t.buyprice * 100).toFixed(1) : '—';
+    const pnlPctVal = calcPnlPct(t, curr);
+    const pnlPct = pnlPctVal !== null ? pnlPctVal.toFixed(1) : null;
+    const pnlAmtRaw = calcPnlAmt(t, curr);
+    const pnlAmt = pnlAmtRaw !== null ? toHKD(pnlAmtRaw, t.code) : null;
+    const pnlColor = pnlPct > 0 ? 'var(--green)' : pnlPct < 0 ? 'var(--red)' : 'inherit';
+    const days = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '—';
+    const typeColor = t.type === 'Short' ? 'color:var(--red);font-weight:700' : t.type === 'VCP早' ? 'color:var(--amber);font-weight:700' : '';
+    // Position weight
+    const px = curr || t.buyprice;
+    const posHKD = toHKD(px * Math.abs(t.shares), t.code);
+    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100).toFixed(1) : '—';
+    const weightColor = parseFloat(weight) > 15 ? 'color:var(--amber);font-weight:700' : 'color:var(--blue-mid);font-weight:700';
+    html += `<tr>
+      <td><strong>${t.code}</strong></td>
+      <td><span class="badge badge-${t.bucket.toLowerCase()}">${t.bucket}</span></td>
+      <td style="${typeColor}">${t.type}</td>
+      <td>${t.buydate}</td>
+      <td style="text-align:center;font-weight:700">${days}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+      <td>${t.buyprice}</td>
+      <td>${t.shares}</td>
+      <td style="background:#f0f4fa;padding:4px">
+        <input type="number" step="0.01" value="${curr || ''}" placeholder="輸入"
+          style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px;font-weight:700"
+          onchange="updateCurrentPrice('${t.code}', this.value)">
+      </td>
+      <td style="background:#f0f4fa;font-weight:700;color:${pnlColor};text-align:center">
+        ${pnlPct !== null ? (pnlPct > 0 ? '+' : '') + pnlPct + '%' : '—'}
+      </td>
+      <td style="background:#f0f4fa;font-weight:700;color:${pnlColor};text-align:right;font-size:12px">
+        ${pnlAmt !== null ? (pnlAmt >= 0 ? '+' : '') + 'HK$' + Math.round(pnlAmt).toLocaleString() +
+          (getCurrency(t.code) !== 'HKD' ? `<br><span style="font-size:10px;font-weight:400;color:#999">${getCurrencyLabel(t.code)}換算</span>` : '') : '—'}
+      </td>
+      <td style="background:#f0f4fa;text-align:center;${weightColor}">${weight}%</td>
+      <td style="color:var(--red);font-size:12px">${t.stop || '—'}<br><span style="font-size:10px">${stopPct}%</span></td>
+      <td style="color:var(--green)">${t.target || '—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})">✏️</button>
+        <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" style="margin-left:2px" title="加倉">➕</button>
+        <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" style="margin-left:2px">平倉</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" style="margin-left:2px">刪</button>
+      </td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+  renderDashPnL();
+}
+
+function exportOpenCSV() {
+  const open = state.trades.filter(t => t.status === 'open');
+  if (!open.length) { showToast('暫無持倉記錄', true); return; }
+  const totalHKD = open.reduce((sum, t) => {
+    const px = state.currentPrices[t.code] || t.buyprice;
+    return sum + toHKD(px * Math.abs(t.shares), t.code);
+  }, 0);
+  const headers = ['股票代碼','桶','類型','買入日','持倉天數','買入價','股數','現價','盈虧%','浮動金額(HKD)','佔比%','止蝕位','目標價','備注'];
+  const rows = open.map(t => {
+    const curr = state.currentPrices[t.code] || '';
+    const days = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '';
+    const pnlPctVal = curr ? calcPnlPct(t, curr) : null;
+    const pnlPct = pnlPctVal !== null ? pnlPctVal.toFixed(1) : '';
+    const pnlAmtRaw = curr ? calcPnlAmt(t, curr) : null;
+    const pnlHKD = pnlAmtRaw !== null ? Math.round(toHKD(pnlAmtRaw, t.code)) : '';
+    const px = curr || t.buyprice;
+    const weight = totalHKD > 0 ? (toHKD(px * Math.abs(t.shares), t.code) / totalHKD * 100).toFixed(1) : '';
+    return [t.code, t.bucket, t.type, t.buydate, days, t.buyprice, t.shares, curr, pnlPct, pnlHKD, weight, t.stop || '', t.target || '', (t.note || '').replace(/,/g,' ')];
+  });
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `持倉記錄_${today}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast(`已匯出 ${open.length} 筆持倉記錄 ✅`);
+}
+
+function renderClosedTrades() {
+  const closed = state.trades.filter(t => t.status === 'closed');
+  const el = document.getElementById('closedTrades');
+  if (!closed.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div>'; return; }
+  const sorted = sortTrades(closed, closedSort);
+  const totalPages = Math.ceil(sorted.length / CLOSED_PAGE_SIZE);
+  if (closedTradesPage >= totalPages) closedTradesPage = totalPages - 1;
+  const pageStart = closedTradesPage * CLOSED_PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + CLOSED_PAGE_SIZE, sorted.length);
+  const paginated = sorted.slice(pageStart, pageEnd);
+  const tid = 'closed';
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+    <span style="font-size:13px;color:var(--gray-dark)">共 <strong>${sorted.length}</strong> 筆記錄，顯示第 ${pageStart+1}–${pageEnd} 筆</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(-1)" ${closedTradesPage === 0 ? 'disabled style="opacity:0.4"' : ''}>◀ 上頁</button>
+      <span style="font-size:13px;font-weight:700;color:var(--blue)">第 ${closedTradesPage+1} / ${totalPages} 頁</span>
+      <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(1)" ${closedTradesPage >= totalPages-1 ? 'disabled style="opacity:0.4"' : ''}>下頁 ▶</button>
+    </div>
+  </div>`;
+  html += `<table class="tbl"><tr>
+    ${thSort('股票','code',tid)}${thSort('桶','bucket',tid)}${thSort('類型','type',tid)}
+    ${thSort('買入日','buydate',tid)}${thSort('賣出日','selldate',tid)}
+    ${thSort('持倉日','days',tid)}
+    ${thSort('買入價','buyprice',tid)}${thSort('賣出價','sellprice',tid)}
+    <th style="cursor:pointer;user-select:none" onclick="sortTh('retPct','closed')">回報%${sortArrow('retPct',tid)}</th>
+    <th style="cursor:pointer;user-select:none" onclick="sortTh('plHKD','closed')">P&amp;L (HK$)${sortArrow('plHKD',tid)}</th>
+    <th style="cursor:pointer;user-select:none" onclick="sortTh('isWin','closed')">勝負${sortArrow('isWin',tid)}</th><th>操作</th></tr>`;
+  paginated.forEach(t => {
+    const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
+    const retPctVal = calcRetPct(t);
+    const retPct = retPctVal !== null ? retPctVal.toFixed(1) : '—';
+    const isWin = retPctVal !== null ? retPctVal > 0 : false;
+    const plRaw = calcPlAmt(t);
+    const plHKD = plRaw !== null ? toHKD(plRaw, t.code) : null;
+    const typeColor = t.type === 'Short' ? 'color:var(--red);font-weight:700' : t.type === 'VCP早' ? 'color:var(--amber);font-weight:700' : '';
+    html += `<tr>
+      <td><strong>${t.code}</strong></td>
+      <td><span class="badge badge-${t.bucket.toLowerCase()}">${t.bucket}</span></td>
+      <td style="${typeColor}">${t.type || '—'}</td>
+      <td>${t.buydate}</td>
+      <td>${t.selldate || '—'}</td>
+      <td style="text-align:center;font-weight:700">${days}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+      <td>${t.buyprice}</td>
+      <td>${t.sellprice || '—'}</td>
+      <td class="${isWin ? 'win' : 'loss'}" style="font-size:13px">${retPct}%</td>
+      <td class="${isWin ? 'win' : 'loss'}" style="font-weight:700;text-align:right;font-size:12px">
+        ${plHKD !== null ? (plHKD >= 0 ? '+' : '') + Math.round(plHKD).toLocaleString() : '—'}
+      </td>
+      <td class="${isWin ? 'win' : 'loss'}">${isWin ? '✅ 贏' : '❌ 輸'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteClosedTrade(${t.id})" style="margin-left:2px;color:var(--red)" title="刪除此平倉記錄">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</table>';
+  if (totalPages > 1) {
+    html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(-1)" ${closedTradesPage === 0 ? 'disabled style="opacity:0.4"' : ''}>◀ 上頁</button>
+      <span style="font-size:13px;font-weight:700;color:var(--blue)">第 ${closedTradesPage+1} / ${totalPages} 頁</span>
+      <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(1)" ${closedTradesPage >= totalPages-1 ? 'disabled style="opacity:0.4"' : ''}>下頁 ▶</button>
+    </div>`;
+  }
+  el.innerHTML = html;
+  renderClosedStats();
+}
+
+function changeClosedPage(delta) {
+  const closed = state.trades.filter(t => t.status === 'closed');
+  const totalPages = Math.ceil(closed.length / CLOSED_PAGE_SIZE);
+  closedTradesPage = Math.max(0, Math.min(closedTradesPage + delta, totalPages - 1));
+  renderClosedTrades();
+  document.getElementById('closedTrades').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// BUCKET POSITIONS (Portfolio Tab)
+// ============================================================
+let currentModalBucket = 'A';
+function openAddPosition(bucket) {
+  currentModalBucket = bucket;
+  document.getElementById('posModalTitle').textContent = `新增${bucket}桶持倉`;
+  document.getElementById('posModal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('posModal').style.display = 'none';
+  ['pos-code','pos-price','pos-shares','pos-stop','pos-target'].forEach(id => document.getElementById(id).value = '');
+}
+function savePosition() {
+  const code = document.getElementById('pos-code').value.trim().toUpperCase();
+  const price = parseFloat(document.getElementById('pos-price').value);
+  const shares = parseFloat(document.getElementById('pos-shares').value);
+  const stop = parseFloat(document.getElementById('pos-stop').value) || 0;
+  const target = parseFloat(document.getElementById('pos-target').value) || 0;
+  const date = document.getElementById('pos-date').value;
+  if (!code || !price || !shares) { showToast('請填寫必要欄位', true); return; }
+  const sizeWarn = checkPositionSizeWarning(currentModalBucket, shares, price);
+  if (sizeWarn && !confirm(sizeWarn)) return;
+  const pos = { id: Date.now(), code, bucket: currentModalBucket, type: 'VCP', buydate: date, buyprice: price, shares, stop, target, sector: '', note: '', status: 'open', selldate: null, sellprice: null };
+  state.trades.push(pos);
+  state.positions.push({ ...pos });
+  save(); closeModal(); renderBucketPositions(); renderOpenPositions(); updateDashPositions();
+  showToast(`${code} 已加入${currentModalBucket}桶 ✅`);
+}
+
+function renderBucketPositions() {
+  ['E','G','B'].forEach(bucket => {
+    const positions = state.trades.filter(t => t.status === 'open' && (t.bucket === bucket || (bucket === 'G' && t.bucket === 'A')));
+    const elId = bucket === 'G' ? 'bucketGList' : `bucket${bucket}List`;
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!positions.length) { el.innerHTML = '<div style="font-size:12px;color:#888;padding:8px 0">暫無持倉</div>'; return; }
+    el.innerHTML = positions.map(p => {
+      const stopPct = p.stop ? ((p.stop - p.buyprice) / p.buyprice * 100).toFixed(1) : '?';
+      const curr = state.currentPrices && state.currentPrices[p.code];
+      const pnlPct = curr ? (calcPnlPct(p, curr)).toFixed(1) : null;
+      const pnlColor = pnlPct > 0 ? 'var(--green)' : pnlPct < 0 ? 'var(--red)' : '#666';
+      return `<div style="background:rgba(255,255,255,0.7);border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <div><strong>${p.code}</strong><br><span style="font-size:11px;color:#666">${p.buydate} · 買@${p.buyprice}</span>
+        ${pnlPct !== null ? `<br><span style="font-size:11px;font-weight:700;color:${pnlColor}">${pnlPct > 0 ? '+' : ''}${pnlPct}%</span>` : ''}
+        </div>
+        <div style="text-align:right"><span style="font-size:11px;color:var(--red)">止蝕 ${stopPct}%</span><br>
+        <button class="btn btn-ghost btn-sm" onclick="closeTrade(${p.id})" style="margin-top:2px;font-size:11px">平倉</button></div>
+      </div>`;
+    }).join('');
+  });
+
+  // D桶 — Dream positions (no stop loss display)
+  const dPositions = state.trades.filter(t => t.status === 'open' && t.bucket === 'D');
+  const dEl = document.getElementById('bucketDList');
+  if (dEl) {
+    if (!dPositions.length) { dEl.innerHTML = '<div style="font-size:12px;color:#888;padding:4px 0">暫無Dream持倉</div>'; }
+    else {
+      dEl.innerHTML = dPositions.map(p => {
+        const costBasis = p.buyprice * p.shares;
+        return `<div style="background:rgba(255,255,255,0.7);border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+          <div><strong>${p.code}</strong> <span style="font-size:10px;background:var(--purple-light);color:var(--purple);border-radius:4px;padding:1px 5px">Dream</span><br>
+          <span style="font-size:11px;color:#666">${p.buydate} · 買@${p.buyprice}</span></div>
+          <div style="text-align:right"><span style="font-size:10px;color:var(--purple)">年底Review</span><br>
+          <button class="btn btn-ghost btn-sm" onclick="closeTrade(${p.id})" style="margin-top:2px;font-size:11px">平倉</button></div>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+// ============================================================
+// REVIEW
+// ============================================================
+function saveReview() {
+  const week = document.getElementById('reviewWeek').value;
+  if (!week) { showToast('請選擇回顧週期', true); return; }
+  const checks = [];
+  document.querySelectorAll('#reviewChecklist .check-item').forEach((item, i) => {
+    checks.push(item.classList.contains('checked'));
+  });
+  state.reviews[week] = {
+    pnl: parseFloat(document.getElementById('r-pnl').value) || 0,
+    trades: parseInt(document.getElementById('r-trades').value) || 0,
+    wins: parseInt(document.getElementById('r-wins').value) || 0,
+    portval: parseFloat(document.getElementById('r-portval').value) || 0,
+    violations: document.getElementById('r-violations').value,
+    nextweek: document.getElementById('r-nextweek').value,
+    checks,
+    date: new Date().toISOString().slice(0,10),
+  };
+  save(); renderReviewHistory(); showToast('每週回顧已保存 ✅');
+}
+
+// ============================================================
+// HISTORY RENDERING
+// ============================================================
+function renderScoreHistory() {
+  const el = document.getElementById('scoreHistory');
+  const entries = Object.entries(state.scores).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 20);
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無歷史記錄</div>'; return; }
+  const modes = [ {min:0,max:2,name:'休息',color:'var(--red)'},{min:3,max:4,name:'防守',color:'var(--amber)'},{min:5,max:6,name:'平衡',color:'var(--blue-mid)'},{min:7,max:8,name:'進攻',color:'var(--green)'} ];
+  el.innerHTML = entries.map(([week, s]) => {
+    const mode = modes.find(m => s.total >= m.min && s.total <= m.max) || modes[0];
+    return `<div class="history-item">
+      <div class="history-score" style="background:${mode.color}">${s.total}</div>
+      <div class="history-detail">
+        <div class="history-mode">${mode.name}模式</div>
+        <div class="history-date">${week} · ${s.date}</div>
+        ${s.note ? `<div style="font-size:11px;color:#666;margin-top:2px">${s.note.substring(0,60)}${s.note.length > 60 ? '...' : ''}</div>` : ''}
+      </div>
+      <div style="text-align:right;font-size:12px;color:#888">
+        Q1:${s.q1} Q2:${s.q2}<br>Q3:${s.q3} Q4:${s.q4}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderReviewHistory() {
+  const el = document.getElementById('reviewHistory');
+  const entries = Object.entries(state.reviews).sort((a,b) => b[0].localeCompare(a[0])).slice(0,10);
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無歷史記錄</div>'; return; }
+  el.innerHTML = entries.map(([week, r]) => {
+    const wr = r.trades ? Math.round(r.wins/r.trades*100) : 0;
+    const passed = r.checks ? r.checks.filter(Boolean).length : 0;
+    const total = r.checks ? r.checks.length : 6;
+    return `<div class="history-item">
+      <div class="history-score" style="background:${r.pnl >= 0 ? 'var(--green)' : 'var(--red)'}">
+        ${r.pnl >= 0 ? '▲' : '▼'}
+      </div>
+      <div class="history-detail">
+        <div class="history-mode">${r.pnl >= 0 ? '+' : ''}HK$${(r.pnl||0).toLocaleString()}</div>
+        <div class="history-date">${week} · 勝率${wr}% · 規則${passed}/${total}通過</div>
+        ${r.violations ? `<div style="font-size:11px;color:var(--red);margin-top:2px">⚠️ ${r.violations.substring(0,60)}</div>` : ''}
+      </div>
+      <div style="font-size:12px;color:#888;text-align:right">${r.trades}筆<br>${r.wins}勝</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// DATA EXPORT / IMPORT
+// ============================================================
+function exportData() {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `wilson_tracker_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  showToast('數據已匯出 ✅');
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      state = JSON.parse(e.target.result);
+      save();
+      location.reload();
+    } catch { showToast('匯入失敗，文件格式不正確', true); }
+  };
+  reader.readAsText(file);
+}
+function clearAllData() {
+  localStorage.removeItem('wilson_tracker');
+  location.reload();
+}
+
+// ============================================================
+// CURRENT PRICE & P&L
+// ============================================================
+function updateCurrentPrice(code, price) {
+  const p = parseFloat(price);
+  if (!isNaN(p) && p > 0) {
+    if (!state.currentPrices) state.currentPrices = {};
+    state.currentPrices[code] = p;
+    save();
+    renderDashPnL();
+    renderBucketPositions();
+  }
+}
+
+function renderDashPnL() {
+  if (!state.currentPrices) state.currentPrices = {};
+  const open = state.trades.filter(t => t.status === 'open');
+  let totalPnL = 0, covered = 0;
+  open.forEach(t => {
+    const curr = state.currentPrices[t.code];
+    if (curr) { totalPnL += toHKD((curr - t.buyprice) * t.shares, t.code); covered++; }
+  });
+  const box = document.getElementById('dash-pnl-box');
+  const el = document.getElementById('dash-unrealized');
+  const sub = document.getElementById('dash-unrealized-sub');
+  if (!el) return;
+  if (covered === 0) {
+    el.textContent = '—';
+    el.style.color = 'inherit';
+    box.className = 'stat-box';
+    sub.textContent = '尚未輸入任何現價';
+    return;
+  }
+  el.textContent = (totalPnL >= 0 ? '+' : '') + 'HK$' + Math.round(totalPnL).toLocaleString();
+  el.style.color = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
+  box.className = 'stat-box ' + (totalPnL >= 0 ? 'stat-green' : 'stat-red');
+  sub.textContent = `${covered}/${open.length} 個持倉已有現價`;
+}
+
+// ============================================================
+// CLOSED TRADES STATS (Dashboard + Tab summary)
+// ============================================================
+function calcClosedStats() {
+  const closed = state.trades.filter(t => t.status === 'closed' && t.sellprice && t.buyprice && t.shares);
+  if (!closed.length) return null;
+  let totalPL = 0, wins = 0, losses = 0, totalWinPct = 0, totalLossPct = 0;
+  let bestWin = null, worstLoss = null;
+  closed.forEach(t => {
+    const plRaw = calcPlAmt(t);
+    if (plRaw === null) return;
+    const plHKD = toHKD(plRaw, t.code);
+    const retPct = calcRetPct(t);
+    if (retPct === null) return;
+    totalPL += plHKD;
+    if (retPct > 0) {
+      wins++;
+      totalWinPct += retPct;
+      if (bestWin === null || retPct > bestWin) bestWin = retPct;
+    } else {
+      losses++;
+      totalLossPct += retPct;
+      if (worstLoss === null || retPct < worstLoss) worstLoss = retPct;
+    }
+  });
+  const total = closed.length;
+  const winRate = (wins / total * 100).toFixed(0);
+  const avgWin = wins ? (totalWinPct / wins).toFixed(1) : null;
+  const avgLoss = losses ? (totalLossPct / losses).toFixed(1) : null;
+  return { total, wins, losses, totalPL, winRate, avgWin, avgLoss, bestWin, worstLoss };
+}
+
+function renderClosedStats() {
+  const el = document.getElementById('dash-closed-stats');
+  if (!el) return;
+  const s = calcClosedStats();
+  if (!s) {
+    el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px">暫無已平倉記錄</div>';
+    return;
+  }
+  const plColor = s.totalPL >= 0 ? 'var(--green)' : 'var(--red)';
+  const winColor = parseInt(s.winRate) >= 50 ? 'var(--green)' : 'var(--red)';
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:100px;background:${s.totalPL>=0?'var(--green-light)':'var(--red-light)'};border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">已實現總盈虧</div>
+        <div style="font-size:18px;font-weight:700;color:${plColor}">${s.totalPL>=0?'+':''}HK$${Math.round(s.totalPL).toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--gray-dark)">${s.total} 筆交易</div>
+      </div>
+      <div style="flex:1;min-width:100px;background:${parseInt(s.winRate)>=50?'var(--green-light)':'var(--red-light)'};border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">勝率</div>
+        <div style="font-size:18px;font-weight:700;color:${winColor}">${s.winRate}%</div>
+        <div style="font-size:11px;color:var(--gray-dark)">${s.wins}勝 / ${s.losses}負</div>
+      </div>
+      <div style="flex:1;min-width:100px;background:var(--gray);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">平均盈虧</div>
+        <div style="font-size:14px;font-weight:700">
+          ${s.avgWin ? `<span style="color:var(--green)">+${s.avgWin}%</span>` : '—'}
+          <span style="color:var(--gray-dark);font-size:11px"> / </span>
+          ${s.avgLoss ? `<span style="color:var(--red)">${s.avgLoss}%</span>` : '—'}
+        </div>
+        <div style="font-size:10px;color:var(--gray-dark)">平均贏 / 平均輸</div>
+      </div>
+      <div style="flex:1;min-width:100px;background:var(--gray);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">最佳 / 最差</div>
+        <div style="font-size:14px;font-weight:700">
+          ${s.bestWin ? `<span style="color:var(--green)">+${s.bestWin.toFixed(1)}%</span>` : '—'}
+          <span style="color:var(--gray-dark);font-size:11px"> / </span>
+          ${s.worstLoss ? `<span style="color:var(--red)">${s.worstLoss.toFixed(1)}%</span>` : '—'}
+        </div>
+        <div style="font-size:10px;color:var(--gray-dark)">單筆最高 / 最低</div>
+      </div>
+    </div>
+    ${s.wins && s.losses ? (() => {
+      const rr = Math.abs(parseFloat(s.avgWin) / parseFloat(s.avgLoss));
+      const rrColor = rr >= 2 ? 'var(--green)' : rr >= 1 ? 'var(--amber)' : 'var(--red)';
+      return `<div style="font-size:12px;color:var(--gray-dark)">盈虧比 (R:R) <strong style="color:${rrColor}">${rr.toFixed(2)} : 1</strong>
+        <span style="margin-left:8px">${rr >= 2 ? '✅ 優秀' : rr >= 1.5 ? '👍 良好' : rr >= 1 ? '⚠️ 偏低' : '❌ 虧損主導'}</span></div>`;
+    })() : ''}
+  `;
+}
+
+// Finnhub API Key management
+function saveFinnhubKey() {
+  const key = document.getElementById('finnhubKey').value.trim();
+  localStorage.setItem('finnhub_key', key);
+}
+function loadFinnhubKey() {
+  const key = localStorage.getItem('finnhub_key') || '';
+  const el = document.getElementById('finnhubKey');
+  if (el) el.value = key;
+  return key;
+}
+
+function renderAll() {
+  calcDrawdown(); updateBuckets();
+  renderOpenPositions(); renderClosedTrades();
+  renderScoreHistory(); renderReviewHistory();
+  renderBucketPositions(); renderDashPnL();
+  renderClosedStats(); updateDashPositions();
+  updateScoreDisplay();
+}
+
+// ============================================================
+// GITHUB GIST CLOUD SYNC
+// ============================================================
+function saveJsonbinKey() {
+  localStorage.setItem('jsonbin_key', document.getElementById('jsonbinKey').value.trim());
+  localStorage.setItem('jsonbin_id',  document.getElementById('jsonbinId').value.trim());
+}
+function loadJsonbinSettings() {
+  const ke = document.getElementById('jsonbinKey');
+  const ie = document.getElementById('jsonbinId');
+  if (ke) ke.value = localStorage.getItem('jsonbin_key') || '';
+  if (ie) ie.value = localStorage.getItem('jsonbin_id')  || '';
+}
+function setSyncStatus(msg, isError) {
+  const el = document.getElementById('syncStatus');
+  if (el) { el.textContent = msg; el.style.color = isError ? 'var(--red)' : 'var(--green)'; }
+}
+function getGistCreds() {
+  const token = (document.getElementById('jsonbinKey') && document.getElementById('jsonbinKey').value.trim())
+                || localStorage.getItem('jsonbin_key') || '';
+  const id    = (document.getElementById('jsonbinId')  && document.getElementById('jsonbinId').value.trim())
+                || localStorage.getItem('jsonbin_id')  || '';
+  return { token, id };
+}
+function gistHeaders(token) {
+  return { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+}
+async function createJsonBin() {
+  const { token } = getGistCreds();
+  if (!token) { setSyncStatus('請先輸入 GitHub Token', true); return; }
+  setSyncStatus('⏳ 建立中...', false);
+  try {
+    const r = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: gistHeaders(token),
+      body: JSON.stringify({
+        description: 'Wilson Investment Tracker Data',
+        public: false,
+        files: { 'wilson_tracker.json': { content: JSON.stringify(state) } }
+      }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
+    const d = await r.json();
+    const gistId = d.id;
+    localStorage.setItem('jsonbin_key', token);
+    localStorage.setItem('jsonbin_id', gistId);
+    document.getElementById('jsonbinId').value = gistId;
+    setSyncStatus(`✅ 建立成功！Gist ID: ${gistId}`, false);
+  } catch(e) {
+    setSyncStatus('❌ 建立失敗：' + e.message, true);
+  }
+}
+async function pushToCloud() {
+  const { token, id } = getGistCreds();
+  if (!token || !id) { setSyncStatus('請先填入 Token 及 Gist ID', true); return; }
+  setSyncStatus('⏳ 推送中...', false);
+  try {
+    const r = await fetch(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH',
+      headers: gistHeaders(token),
+      body: JSON.stringify({ files: { 'wilson_tracker.json': { content: JSON.stringify(state) } } }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
+    const now = new Date().toLocaleString('zh-HK');
+    setSyncStatus(`✅ 已推送到雲端 (${now})`, false);
+  } catch(e) {
+    setSyncStatus('❌ 推送失敗：' + e.message, true);
+  }
+}
+async function pullFromCloud() {
+  const { token, id } = getGistCreds();
+  if (!token || !id) { setSyncStatus('請先填入 Token 及 Gist ID', true); return; }
+  if (!confirm('從雲端載入會覆蓋本機所有數據，確定繼續？')) return;
+  setSyncStatus('⏳ 載入中...', false);
+  try {
+    const r = await fetch(`https://api.github.com/gists/${id}`, {
+      headers: gistHeaders(token),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
+    const d = await r.json();
+    const file = d.files && d.files['wilson_tracker.json'];
+    if (!file) throw new Error('找不到 wilson_tracker.json');
+    // If content is truncated, fetch raw_url
+    const content = file.truncated
+      ? await (await fetch(file.raw_url, { signal: AbortSignal.timeout(20000) })).text()
+      : file.content;
+    const remote = JSON.parse(content);
+    if (!remote || typeof remote !== 'object') throw new Error('數據格式錯誤');
+    state = { ...state, ...remote };
+    save();
+    renderAll();
+    const now = new Date().toLocaleString('zh-HK');
+    setSyncStatus(`✅ 已從雲端載入 (${now})`, false);
+    showToast('從雲端載入成功 ✅');
+  } catch(e) {
+    setSyncStatus('❌ 載入失敗：' + e.message, true);
+  }
+}
+async function testFinnhubKey() {
+  const key = document.getElementById('finnhubKey').value.trim();
+  if (!key) { document.getElementById('finnhubStatus').innerHTML = '<span style="color:var(--red)">請先輸入 API Key</span>'; return; }
+  const el = document.getElementById('finnhubStatus');
+  el.innerHTML = '⏳ 測試中...';
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
+    const d = await r.json();
+    if (d.c > 0) {
+      el.innerHTML = `<span style="color:var(--green)">✅ 連線成功！AAPL 現價: $${d.c}</span>`;
+      localStorage.setItem('finnhub_key', key);
+    } else { el.innerHTML = '<span style="color:var(--red)">❌ Key無效，請重新確認</span>'; }
+  } catch { el.innerHTML = '<span style="color:var(--red)">❌ 連線失敗</span>'; }
+}
+
+async function fetchAllPrices() {
+  const open = state.trades.filter(t => t.status === 'open');
+  if (!open.length) { showToast('暫無持倉', true); return; }
+  const codes = [...new Set(open.map(t => t.code))];
+  const btn = document.getElementById('fetchBtn');
+  const status = document.getElementById('fetchStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 抓取中...';
+  status.textContent = '';
+  if (!state.currentPrices) state.currentPrices = {};
+
+  const finnhubKey = localStorage.getItem('finnhub_key') || '';
+
+  if (!finnhubKey) {
+    btn.disabled = false;
+    btn.textContent = '⬇️ 自動抓取 (Yahoo)';
+    status.innerHTML = '❌ 請先在「歷史記錄」→「現價 API 設定」輸入 Finnhub API Key';
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  let ok = 0, fail = 0;
+  for (const code of codes) {
+    // All suffixes uppercased: 1888.hk→1888.HK, 7203.t→7203.T, 005930.ks→005930.KS
+    const symbol = code.toUpperCase();
+    try {
+      const r = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubKey}`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const d = await r.json();
+      if (d.c && d.c > 0) { state.currentPrices[code] = d.c; ok++; }
+      else throw new Error('No price');
+    } catch { fail++; }
+  }
+
+  save();
+  btn.disabled = false;
+  btn.textContent = '⬇️ 自動抓取 (Finnhub)';
+
+  if (ok > 0) {
+    renderOpenPositions();
+    renderDashPnL();
+    autoCalcBuckets(); // 現價更新後自動重算五桶
+    status.textContent = `✅ ${ok}隻成功${fail > 0 ? ` · ${fail}隻失敗` : ''}`;
+    status.style.color = fail > 0 ? 'var(--amber)' : 'var(--green)';
+  } else {
+    status.textContent = '❌ 抓取失敗，請手動輸入現價';
+    status.style.color = 'var(--red)';
+  }
+}
+
+// ============================================================
+// EDIT TRADE
+// ============================================================
+let _editId = null;
+function editTrade(id) {
+  const t = state.trades.find(t => t.id === id);
+  if (!t) return;
+  _editId = id;
+  const isClosed = t.status === 'closed';
+  document.getElementById('editModalTitle').textContent = isClosed ? '✏️ 編輯已平倉記錄' : '✏️ 編輯持倉';
+  document.getElementById('edit-code-display').textContent = `${t.code}  ·  ${t.bucket}桶  ·  ${isClosed ? '已平倉' : '持倉中'}`;
+  document.getElementById('edit-code-input').value = t.code || '';
+  document.getElementById('edit-bucket').value = t.bucket || 'B';
+  document.getElementById('edit-type').value = t.type || 'VCP';
+  document.getElementById('edit-price').value = t.buyprice;
+  document.getElementById('edit-shares').value = t.shares;
+  document.getElementById('edit-stop').value = t.stop || '';
+  document.getElementById('edit-target').value = t.target || '';
+  document.getElementById('edit-date').value = t.buydate;
+  document.getElementById('edit-sector').value = t.sector || '';
+  document.getElementById('edit-note').value = t.note || '';
+  // Closed-specific fields
+  document.getElementById('edit-open-fields').style.display = isClosed ? 'none' : '';
+  document.getElementById('edit-closed-fields').style.display = isClosed ? '' : 'none';
+  document.getElementById('edit-reopen-btn').style.display = isClosed ? 'inline-block' : 'none';
+  if (isClosed) {
+    document.getElementById('edit-selldate').value = t.selldate || '';
+    document.getElementById('edit-sellprice').value = t.sellprice || '';
+  }
+  document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  _editId = null;
+}
+function saveEditTrade() {
+  if (!_editId) return;
+  const idx = state.trades.findIndex(t => t.id === _editId);
+  if (idx < 0) return;
+  const t = state.trades[idx];
+  const isClosed = t.status === 'closed';
+  t.code     = document.getElementById('edit-code-input').value.trim().toUpperCase() || t.code;
+  t.bucket   = document.getElementById('edit-bucket').value || t.bucket;
+  t.type     = document.getElementById('edit-type').value || t.type;
+  t.buyprice = parseFloat(document.getElementById('edit-price').value) || t.buyprice;
+  t.shares   = parseFloat(document.getElementById('edit-shares').value) || t.shares;
+  t.buydate  = document.getElementById('edit-date').value || t.buydate;
+  t.sector   = document.getElementById('edit-sector').value;
+  t.note     = document.getElementById('edit-note').value;
+  if (isClosed) {
+    t.sellprice = parseFloat(document.getElementById('edit-sellprice').value) || t.sellprice;
+    t.selldate  = document.getElementById('edit-selldate').value || t.selldate;
+  } else {
+    t.stop   = parseFloat(document.getElementById('edit-stop').value) || 0;
+    t.target = parseFloat(document.getElementById('edit-target').value) || 0;
+    // Sync positions array
+    const pi = state.positions.findIndex(p => p.id === _editId);
+    if (pi >= 0) Object.assign(state.positions[pi], t);
+  }
+  save();
+  closeEditModal();
+  if (isClosed) { renderClosedTrades(); } else { renderOpenPositions(); renderBucketPositions(); }
+  showToast(`${t.code} 資料已更新 ✅`);
+}
+function reopenTrade() {
+  if (!_editId) return;
+  if (!confirm('確定將此已平倉記錄重新開倉？')) return;
+  const idx = state.trades.findIndex(t => t.id === _editId);
+  if (idx < 0) return;
+  const t = state.trades[idx];
+  t.status = 'open';
+  t.selldate = null;
+  t.sellprice = null;
+  // Re-add to positions array if not already there
+  if (!state.positions.find(p => p.id === t.id)) state.positions.push({ ...t });
+  save();
+  closeEditModal();
+  renderClosedTrades();
+  renderOpenPositions();
+  renderBucketPositions();
+  showToast(`${t.code} 已重新開倉 ↩️`);
+}
+
+// ============================================================
+// POSITION SIZE CALCULATOR
+// ============================================================
+function calcPositionSize() {
+  const total = parseFloat(document.getElementById('calc-total').value) || 0;
+  const pct = parseFloat(document.getElementById('calc-pct').value) || 0;
+  const res = document.getElementById('calc-result');
+  if (!total || !pct) { res.style.display = 'none'; return; }
+  const full = total * pct / 100;
+  const first = full * 0.6;
+  const second = full * 0.4;
+  const maxloss = full * 0.07;
+  res.style.display = 'block';
+  document.getElementById('calc-full').textContent = 'HK$' + Math.round(full).toLocaleString();
+  document.getElementById('calc-first').textContent = 'HK$' + Math.round(first).toLocaleString();
+  document.getElementById('calc-second').textContent = 'HK$' + Math.round(second).toLocaleString();
+  document.getElementById('calc-maxloss').textContent = '-HK$' + Math.round(maxloss).toLocaleString();
+}
+
+function checkPositionSizeWarning(bucket, shares, buyprice) {
+  const total = state.peakVal || state.currVal || 0;
+  if (!total) return null;
+  const posValue = shares * buyprice;
+  const posP = posValue / total * 100;
+  const limits = { E: 20, G: 12, A: 12, B: 8, D: 3 };
+  const limit = limits[bucket];
+  if (limit && posP > limit) {
+    return `⚠️ 此倉位佔組合 ${posP.toFixed(1)}%，超出${bucket}桶單倉上限 ${limit}%！確定繼續？`;
+  }
+  return null;
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function getWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+let toastTimer;
+function showToast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = err ? 'var(--red)' : 'var(--blue)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// DAILY PERFORMANCE
+// ============================================================
+let dpChanges = []; // pending position changes for today's entry
+
+function dpInit() {
+  if (!state.dailyPerf) state.dailyPerf = [];
+  document.getElementById('dp-date').value = new Date().toISOString().split('T')[0];
+  dpAutoFill();
+  renderDailyHistory();
+  renderDailyComparison();
+}
+
+function dpAutoFill() {
+  // Fill from current state
+  document.getElementById('dp-total').value = state.currVal || '';
+  document.getElementById('dp-e').value = state.bucketE || '';
+  document.getElementById('dp-g').value = state.bucketG || '';
+  document.getElementById('dp-b').value = state.bucketB || '';
+  document.getElementById('dp-c').value = state.bucketC || '';
+  document.getElementById('dp-d').value = state.bucketD || '';
+}
+
+function dpAddChange(type) {
+  const labels = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+  const colors = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  const placeholder = type === 'open' ? '例：MU 100股 @ US$95' : '例：AAPL 50股 @ US$190';
+  const id = Date.now();
+  dpChanges.push({ id, type, text: '' });
+  const list = document.getElementById('dp-changes-list');
+  const row = document.createElement('div');
+  row.id = `dpchange-${id}`;
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = `
+    <span style="font-size:12px;color:${colors[type]};white-space:nowrap;min-width:70px">${labels[type]}</span>
+    <input type="text" placeholder="${placeholder}"
+      style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+      oninput="dpChanges.find(c=>c.id===${id}).text=this.value">
+    <button onclick="dpRemoveChange(${id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+  list.appendChild(row);
+}
+
+function dpRemoveChange(id) {
+  dpChanges = dpChanges.filter(c => c.id !== id);
+  const el = document.getElementById(`dpchange-${id}`);
+  if (el) el.remove();
+}
+
+function dpAutoDetectChanges() {
+  const today = document.getElementById('dp-date').value || new Date().toISOString().split('T')[0];
+  const opened = state.trades.filter(t => t.buydate === today && t.status === 'open');
+  const closed = state.trades.filter(t => t.selldate === today && t.status === 'closed');
+  opened.forEach(t => {
+    const sym = getCurrencyLabel(t.code);
+    dpChanges.push({ id: Date.now() + Math.random(), type: 'open', text: `${t.code} ${t.shares}股 @ ${sym}${t.buyprice}` });
+  });
+  closed.forEach(t => {
+    const sym = getCurrencyLabel(t.code);
+    const note = t.note && t.note.includes('部分') ? 'partial' : 'close';
+    dpChanges.push({ id: Date.now() + Math.random(), type: note, text: `${t.code} ${t.shares}股 @ ${sym}${t.sellprice}` });
+  });
+  // Re-render the list
+  document.getElementById('dp-changes-list').innerHTML = '';
+  dpChanges.forEach(c => {
+    const labels = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+    const colors = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+    const row = document.createElement('div');
+    row.id = `dpchange-${c.id}`;
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    row.innerHTML = `
+      <span style="font-size:12px;color:${colors[c.type]};white-space:nowrap;min-width:70px">${labels[c.type]}</span>
+      <input type="text" value="${c.text}"
+        style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+        oninput="dpChanges.find(x=>x.id===${c.id}).text=this.value">
+      <button onclick="dpRemoveChange(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+    document.getElementById('dp-changes-list').appendChild(row);
+  });
+  if (!opened.length && !closed.length) showToast('今日暫無交易記錄', false);
+  else showToast(`偵測到 ${opened.length} 個新倉, ${closed.length} 個平倉 ✅`);
+}
+
+function saveDailyPerf() {
+  if (!state.dailyPerf) state.dailyPerf = [];
+  const date = document.getElementById('dp-date').value;
+  if (!date) { showToast('請選擇日期', true); return; }
+  const entry = {
+    date,
+    total: parseFloat(document.getElementById('dp-total').value) || 0,
+    e: parseFloat(document.getElementById('dp-e').value) || 0,
+    g: parseFloat(document.getElementById('dp-g').value) || 0,
+    b: parseFloat(document.getElementById('dp-b').value) || 0,
+    c: parseFloat(document.getElementById('dp-c').value) || 0,
+    d: parseFloat(document.getElementById('dp-d').value) || 0,
+    changes: dpChanges.filter(c => c.text).map(c => ({ type: c.type, text: c.text })),
+    note: document.getElementById('dp-note').value,
+  };
+  // Replace if same date exists
+  const idx = state.dailyPerf.findIndex(r => r.date === date);
+  if (idx >= 0) state.dailyPerf[idx] = entry;
+  else state.dailyPerf.push(entry);
+  state.dailyPerf.sort((a, b) => b.date.localeCompare(a.date));
+  save();
+  dpChanges = [];
+  document.getElementById('dp-changes-list').innerHTML = '';
+  document.getElementById('dp-note').value = '';
+  renderDailyHistory();
+  renderDailyComparison();
+  showToast(`${date} 每日表現已儲存 ✅`);
+}
+
+function dpDelta(curr, prev) {
+  if (!prev || !curr) return null;
+  return curr - prev;
+}
+function dpDeltaHtml(val, prevVal, isCurrency) {
+  const delta = dpDelta(val, prevVal);
+  if (delta === null) return '<span style="color:#aaa">—</span>';
+  const pct = prevVal ? (delta / prevVal * 100).toFixed(1) : null;
+  const color = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : '#888';
+  const sign = delta >= 0 ? '+' : '';
+  const amtStr = isCurrency ? `${sign}HK$${Math.round(delta).toLocaleString()}` : `${sign}${delta.toLocaleString()}`;
+  const pctStr = pct !== null ? ` (${sign}${pct}%)` : '';
+  return `<span style="color:${color};font-weight:700">${amtStr}${pctStr}</span>`;
+}
+
+function renderDailyComparison() {
+  const el = document.getElementById('dp-comparison');
+  if (!state.dailyPerf || state.dailyPerf.length < 2) {
+    el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px">需要至少兩天記錄才能顯示比較</div>';
+    return;
+  }
+  const today = state.dailyPerf[0];
+  const prev  = state.dailyPerf[1];
+  const buckets = [
+    { key: 'e', label: 'E桶 ETF',    color: 'var(--teal)' },
+    { key: 'g', label: 'G桶 增長股', color: 'var(--green)' },
+    { key: 'b', label: 'B桶 VCP',    color: 'var(--blue-mid)' },
+    { key: 'c', label: 'C桶 現金',   color: 'var(--gold)' },
+    { key: 'd', label: 'D桶 Dream',  color: 'var(--purple)' },
+  ];
+  const totalDelta = dpDelta(today.total, prev.total);
+  const totalColor = totalDelta > 0 ? 'var(--green)' : totalDelta < 0 ? 'var(--red)' : '#888';
+  let html = `
+    <div style="background:${totalDelta>=0?'var(--green-light)':'var(--red-light)'};border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:var(--gray-dark)">組合總值 vs ${prev.date}</div>
+        <div style="font-size:22px;font-weight:700;color:${totalColor}">
+          ${totalDelta>=0?'+':''}HK$${Math.round(totalDelta||0).toLocaleString()}
+          ${prev.total ? `<span style="font-size:14px">(${(totalDelta/prev.total*100).toFixed(2)}%)</span>` : ''}
+        </div>
+      </div>
+      <div style="text-align:right;font-size:13px;color:var(--gray-dark)">
+        今日：HK$${Math.round(today.total).toLocaleString()}<br>
+        上日：HK$${Math.round(prev.total).toLocaleString()}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">`;
+  buckets.forEach(b => {
+    const delta = dpDelta(today[b.key], prev[b.key]);
+    const sign = delta >= 0 ? '+' : '';
+    const color = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : '#888';
+    const pct = prev[b.key] ? (delta / prev[b.key] * 100).toFixed(1) : null;
+    html += `
+      <div style="flex:1;min-width:110px;background:var(--gray);border-radius:8px;padding:8px;border-left:3px solid ${b.color}">
+        <div style="font-size:11px;color:${b.color};font-weight:700;margin-bottom:3px">${b.label}</div>
+        <div style="font-size:13px;font-weight:700;color:${color}">
+          ${delta!==null ? sign+'HK$'+Math.round(delta).toLocaleString() : '—'}
+        </div>
+        <div style="font-size:10px;color:#888">${pct!==null ? sign+pct+'%' : ''}</div>
+        <div style="font-size:10px;color:var(--gray-dark)">今：HK$${Math.round(today[b.key]||0).toLocaleString()}</div>
+      </div>`;
+  });
+  html += '</div>';
+  // Today's position changes
+  if (today.changes && today.changes.length) {
+    const typeStyle = { open: 'color:var(--green)', partial: 'color:var(--amber)', close: 'color:var(--red)' };
+    const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
+    html += `<div style="font-size:12px;font-weight:700;margin-bottom:6px">今日倉位變動</div>
+      <div style="display:flex;flex-direction:column;gap:4px">`;
+    today.changes.forEach(c => {
+      html += `<div style="font-size:12px;${typeStyle[c.type]||''}"><span style="margin-right:4px">${typeLabel[c.type]||''}</span>${c.text}</div>`;
+    });
+    html += '</div>';
+  }
+  if (today.note) html += `<div style="margin-top:10px;font-size:12px;color:var(--gray-dark);border-top:1px solid var(--gray-mid);padding-top:8px">📝 ${today.note}</div>`;
+  el.innerHTML = html;
+}
+
+function renderDailyHistory() {
+  const el = document.getElementById('dp-history');
+  if (!state.dailyPerf || !state.dailyPerf.length) {
+    el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div>';
+    return;
+  }
+  const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
+  const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  let html = `<table class="tbl"><tr>
+    <th>日期</th><th>組合值</th><th>日變動</th>
+    <th>E桶 ETF</th>
+    <th>G桶 增長股</th>
+    <th>B桶 VCP</th>
+    <th>C桶 現金</th>
+    <th>D桶 Dream</th>
+    <th>倉位變動</th><th>操作</th></tr>`;
+  // Helper: render bucket cell with value + delta vs prev day
+  function dpBucketCell(val, prevVal) {
+    const amt = Math.round(val || 0);
+    const delta = (prevVal !== undefined && prevVal !== null) ? (val||0) - (prevVal||0) : null;
+    const pct = (delta !== null && prevVal) ? (delta / prevVal * 100).toFixed(1) : null;
+    const sign = delta >= 0 ? '+' : '';
+    const color = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : '#888';
+    return `<td style="text-align:right;font-size:12px">
+      HK$${amt.toLocaleString()}
+      ${delta !== null ? `<br><span style="font-size:10px;color:${color};font-weight:700">${sign}${pct}%</span>` : ''}
+    </td>`;
+  }
+  state.dailyPerf.forEach((r, i) => {
+    const prev = state.dailyPerf[i + 1];
+    const delta = prev ? r.total - prev.total : null;
+    const deltaColor = delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : '#888';
+    const sign = delta >= 0 ? '+' : '';
+    const pct = (prev && prev.total) ? (delta / prev.total * 100).toFixed(1) : null;
+    const changesHtml = r.changes && r.changes.length
+      ? r.changes.map(c => `<span style="color:${typeColor[c.type]||'#555'};font-size:11px">${typeLabel[c.type]||''} ${c.text}</span>`).join('<br>')
+      : '<span style="color:#aaa;font-size:11px">無</span>';
+    html += `<tr>
+      <td style="white-space:nowrap"><strong>${r.date}</strong></td>
+      <td style="text-align:right">HK$${Math.round(r.total).toLocaleString()}</td>
+      <td style="color:${deltaColor};font-weight:700;text-align:right;white-space:nowrap">
+        ${delta !== null ? sign+'HK$'+Math.round(delta).toLocaleString()+'<br><span style="font-size:10px">'+(sign+(pct||'0'))+'%</span>' : '—'}
+      </td>
+      ${dpBucketCell(r.e, prev?.e)}
+      ${dpBucketCell(r.g, prev?.g)}
+      ${dpBucketCell(r.b, prev?.b)}
+      ${dpBucketCell(r.c, prev?.c)}
+      ${dpBucketCell(r.d, prev?.d)}
+      <td style="font-size:11px;max-width:160px">${changesHtml}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="dpLoadEdit('${r.date}')">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="dpDeleteEntry('${r.date}')" style="color:var(--red);margin-left:2px">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function dpLoadEdit(date) {
+  const r = state.dailyPerf.find(x => x.date === date);
+  if (!r) return;
+  document.getElementById('dp-date').value = r.date;
+  document.getElementById('dp-total').value = r.total || '';
+  document.getElementById('dp-e').value = r.e || '';
+  document.getElementById('dp-g').value = r.g || '';
+  document.getElementById('dp-b').value = r.b || '';
+  document.getElementById('dp-c').value = r.c || '';
+  document.getElementById('dp-d').value = r.d || '';
+  document.getElementById('dp-note').value = r.note || '';
+  dpChanges = (r.changes || []).map(c => ({ ...c, id: Date.now() + Math.random() }));
+  const list = document.getElementById('dp-changes-list');
+  list.innerHTML = '';
+  const typeLabel = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+  const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  dpChanges.forEach(c => {
+    const row = document.createElement('div');
+    row.id = `dpchange-${c.id}`;
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    row.innerHTML = `
+      <span style="font-size:12px;color:${typeColor[c.type]};white-space:nowrap;min-width:70px">${typeLabel[c.type]}</span>
+      <input type="text" value="${c.text}"
+        style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+        oninput="dpChanges.find(x=>x.id===${c.id}).text=this.value">
+      <button onclick="dpRemoveChange(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+    list.appendChild(row);
+  });
+  showToast(`已載入 ${date} 記錄，修改後按儲存`);
+  document.getElementById('tab-daily').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function dpDeleteEntry(date) {
+  if (!confirm(`確定刪除 ${date} 的每日表現記錄？`)) return;
+  state.dailyPerf = state.dailyPerf.filter(r => r.date !== date);
+  save();
+  renderDailyHistory();
+  renderDailyComparison();
+  showToast(`${date} 記錄已刪除`);
+}
+</script>
+</body>
+</html>

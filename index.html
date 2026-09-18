@@ -267,6 +267,21 @@
           <input type="number" id="krwRate" step="0.00001" value="0.0057" oninput="saveAllRates()">
         </div>
       </div>
+      <!-- Fee settings -->
+      <div style="border-top:1px solid var(--gray-mid);margin-top:12px;padding-top:12px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--blue)">💰 手續費設定（每筆買入或賣出）</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:100px">
+            <label style="font-size:11px">美股 / 其他 (US$)</label>
+            <input type="number" id="feeUs" step="0.01" value="2.05" oninput="saveFees()">
+          </div>
+          <div style="flex:1;min-width:100px">
+            <label style="font-size:11px">港股 (HK$)</label>
+            <input type="number" id="feeHk" step="0.5" value="55" oninput="saveFees()">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--gray-dark);margin-top:5px">每筆已平倉交易自動計入 2 次費用（買入＋賣出）</div>
+      </div>
     </div>
 
     <div class="card">
@@ -1102,6 +1117,7 @@ let state = {
   dailyPerf: [],  // array of daily snapshots
   qqqHistory: [], // accumulated QQQ daily prices for MA/RSI (auto-score)
   monthlyComments: {}, // { 'YYYY-MM': 'comment text' }
+  fees: { us: 2.05, hk: 55 }, // per transaction leg (buy OR sell), USD / HKD
 };
 
 let _autoSyncTimer = null;
@@ -1168,6 +1184,8 @@ function restoreInputs() {
   document.getElementById('usdRate').value = state.usdRate || 7.78;
   document.getElementById('jpyRate').value = state.jpyRate || 0.051;
   document.getElementById('krwRate').value = state.krwRate || 0.0057;
+  document.getElementById('feeUs').value = (state.fees && state.fees.us != null) ? state.fees.us : 2.05;
+  document.getElementById('feeHk').value = (state.fees && state.fees.hk != null) ? state.fees.hk : 55;
   if (state.bucketE) document.getElementById('bucketE').value = state.bucketE;
   if (state.bucketG) document.getElementById('bucketG').value = state.bucketG;
   if (state.bucketB) document.getElementById('bucketB').value = state.bucketB;
@@ -1213,6 +1231,30 @@ function toHKD(amount, code) {
   if (cur === 'JPY') return amount * (parseFloat(state.jpyRate) || 0.051);
   if (cur === 'KRW') return amount * (parseFloat(state.krwRate) || 0.0057);
   return amount * (parseFloat(state.usdRate) || 7.78); // USD
+}
+// legs: 1 = buy-only (open position), 2 = buy+sell (closed trade)
+function calcFeeHKD(t, legs = 2) {
+  const cur = getCurrency(t.code);
+  if (cur === 'HKD') {
+    const feeHk = (state.fees && state.fees.hk != null) ? state.fees.hk : 55;
+    return feeHk * legs;
+  }
+  const feeUs = (state.fees && state.fees.us != null) ? state.fees.us : 2.05;
+  return feeUs * legs * (parseFloat(state.usdRate) || 7.78);
+}
+function calcNetPlHKD(t) {
+  const plRaw = calcPlAmt(t);
+  if (plRaw === null) return null;
+  return toHKD(plRaw, t.code) - calcFeeHKD(t, 2);
+}
+function saveFees() {
+  if (!state.fees) state.fees = {};
+  state.fees.us = parseFloat(document.getElementById('feeUs').value) || 2.05;
+  state.fees.hk = parseFloat(document.getElementById('feeHk').value) || 55;
+  save();
+  renderClosedTrades();
+  renderClosedStats();
+  renderMonthlyPerf();
 }
 function getCurrencyLabel(code) {
   const cur = getCurrency(code);
@@ -2055,9 +2097,9 @@ function renderClosedTrades() {
     const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
     const retPctVal = calcRetPct(t);
     const retPct = retPctVal !== null ? retPctVal.toFixed(1) : '—';
-    const isWin = retPctVal !== null ? retPctVal > 0 : false;
-    const plRaw = calcPlAmt(t);
-    const plHKD = plRaw !== null ? toHKD(plRaw, t.code) : null;
+    const netHKD = calcNetPlHKD(t);
+    const feeHKD = calcFeeHKD(t, 2);
+    const isWin = netHKD !== null ? netHKD > 0 : (retPctVal !== null ? retPctVal > 0 : false);
     const typeColor = t.type === 'Short' ? 'color:var(--red);font-weight:700' : t.type === 'VCP早' ? 'color:var(--amber);font-weight:700' : '';
     html += `<tr>
       <td><strong>${t.code}</strong></td>
@@ -2070,7 +2112,8 @@ function renderClosedTrades() {
       <td>${t.sellprice || '—'}</td>
       <td class="${isWin ? 'win' : 'loss'}" style="font-size:13px">${retPct}%</td>
       <td class="${isWin ? 'win' : 'loss'}" style="font-weight:700;text-align:right;font-size:12px">
-        ${plHKD !== null ? (plHKD >= 0 ? '+' : '') + Math.round(plHKD).toLocaleString() : '—'}
+        ${netHKD !== null ? (netHKD >= 0 ? '+' : '') + Math.round(netHKD).toLocaleString() : '—'}
+        <div style="font-size:10px;color:var(--gray-dark);font-weight:400">手續費 -${Math.round(feeHKD)}</div>
       </td>
       <td class="${isWin ? 'win' : 'loss'}">${isWin ? '✅ 贏' : '❌ 輸'}</td>
       <td style="white-space:nowrap">
@@ -2317,13 +2360,12 @@ function calcClosedStats() {
   let totalPL = 0, wins = 0, losses = 0, totalWinPct = 0, totalLossPct = 0;
   let bestWin = null, worstLoss = null;
   closed.forEach(t => {
-    const plRaw = calcPlAmt(t);
-    if (plRaw === null) return;
-    const plHKD = toHKD(plRaw, t.code);
+    const netHKD = calcNetPlHKD(t);
+    if (netHKD === null) return;
     const retPct = calcRetPct(t);
     if (retPct === null) return;
-    totalPL += plHKD;
-    if (retPct > 0) {
+    totalPL += netHKD;
+    if (netHKD > 0) {
       wins++;
       totalWinPct += retPct;
       if (bestWin === null || retPct > bestWin) bestWin = retPct;
@@ -2353,7 +2395,7 @@ function renderClosedStats() {
   el.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <div style="flex:1;min-width:100px;background:${s.totalPL>=0?'var(--green-light)':'var(--red-light)'};border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">已實現總盈虧</div>
+        <div style="font-size:11px;color:var(--gray-dark);margin-bottom:2px">已實現總盈虧（扣費後）</div>
         <div style="font-size:18px;font-weight:700;color:${plColor}">${s.totalPL>=0?'+':''}HK$${Math.round(s.totalPL).toLocaleString()}</div>
         <div style="font-size:11px;color:var(--gray-dark)">${s.total} 筆交易</div>
       </div>
@@ -3086,14 +3128,21 @@ function renderMonthlyPerf() {
 
     const totalCostHKD = trades.reduce((s, t) =>
       s + toHKD(t.buyprice * Math.abs(t.shares || 0), t.code), 0);
+    // Net P/L = gross P/L minus all fees (buy+sell per trade)
     const plHKD = trades.reduce((s, t) => {
-      const amt = calcPlAmt(t);
-      return s + (amt !== null ? toHKD(amt, t.code) : 0);
+      const net = calcNetPlHKD(t);
+      return s + (net !== null ? net : 0);
     }, 0);
+    const totalFeesHKD = trades.reduce((s, t) => s + calcFeeHKD(t, 2), 0);
+
+    // Re-classify wins/losses based on net P/L for accuracy
+    const winsNet   = trades.filter(t => (calcNetPlHKD(t) || 0) > 0);
+    const lossesNet = trades.filter(t => (calcNetPlHKD(t) || 0) <= 0);
+    const winRateNet = total ? winsNet.length / total : 0;
 
     // Strategy Result (adj) = expectancy per trade = WinRate*AvgGain + LossRate*AvgLoss
     const stratResult = (avgGain !== null && avgLoss !== null)
-      ? winRate * avgGain + (1 - winRate) * avgLoss : null;
+      ? winRateNet * avgGain + (1 - winRateNet) * avgLoss : null;
 
     const pct = (v, dec=1) => v !== null ? `${v>=0?'+':''}${v.toFixed(dec)}%` : '—';
     const plColor  = plHKD >= 0 ? 'var(--green)' : 'var(--red)';
@@ -3117,7 +3166,9 @@ function renderMonthlyPerf() {
         ${rr !== null ? rr.toFixed(2) : '—'}</td>
       <td style="${tdStyle()}">HK$${Math.round(totalCostHKD).toLocaleString()}</td>
       <td style="${tdStyle()};color:${plColor};font-weight:700">
-        ${plHKD>=0?'+':''}HK$${Math.round(plHKD).toLocaleString()}</td>
+        ${plHKD>=0?'+':''}HK$${Math.round(plHKD).toLocaleString()}
+        <div style="font-size:10px;color:var(--gray-dark);font-weight:400">費 -${Math.round(totalFeesHKD)}</div>
+      </td>
       <td style="${tdStyle()};color:${srColor};font-weight:700">${pct(stratResult)}</td>
       <td style="${tdStyle('left')}">
         <div style="display:flex;gap:6px;align-items:center">

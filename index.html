@@ -1971,6 +1971,16 @@ function toggleGroup(code) {
   else expandedGroups.add(code);
   renderOpenPositions();
 }
+let openGroupSort = { col: 'weight', dir: -1 }; // default: weight desc
+function sortOpenTh(col) {
+  if (openGroupSort.col === col) openGroupSort.dir *= -1;
+  else { openGroupSort.col = col; openGroupSort.dir = -1; }
+  renderOpenPositions();
+}
+function openArrow(col) {
+  if (openGroupSort.col !== col) return '<span style="opacity:0.3;font-size:9px"> ⇅</span>';
+  return openGroupSort.dir > 0 ? ' ▲' : ' ▼';
+}
 
 function renderOpenPositions() {
   const open = state.trades.filter(t => t.status === 'open');
@@ -1984,28 +1994,58 @@ function renderOpenPositions() {
     return sum + toHKD(px * Math.abs(t.shares), t.code);
   }, 0);
 
-  // Group by code, preserving order of first appearance (sorted by first buydate desc)
+  // Group by code
   const groupMap = {};
   open.forEach(t => {
     if (!groupMap[t.code]) groupMap[t.code] = [];
     groupMap[t.code].push(t);
   });
-  // Sort groups by total position weight desc
+
+  // Pre-compute aggregate stats per group for sorting
+  const groupStats = {};
+  Object.keys(groupMap).forEach(code => {
+    const lots = groupMap[code];
+    const curr = state.currentPrices[code] || null;
+    const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
+    const totalCostNative = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares || 0), 0);
+    const avgBuy = totalShares > 0 ? totalCostNative / totalShares : 0;
+    const posValHKD = toHKD((curr || avgBuy) * totalShares, code);
+    const weight = totalHKD > 0 ? posValHKD / totalHKD * 100 : 0;
+    const pnlPctGroup = curr ? (tradeDir(lots[0]) * (curr - avgBuy) / avgBuy * 100) : null;
+    const totalPnlHKD = lots.reduce((s, t) => { const r = calcPnlAmt(t, curr); return s + (r !== null ? toHKD(r, t.code) : 0); }, 0);
+    const firstDate = lots.map(t => t.buydate).filter(Boolean).sort()[0] || '';
+    const daysSince = firstDate ? Math.round((new Date() - new Date(firstDate)) / 86400000) : 0;
+    groupStats[code] = { weight, pnlPctGroup, totalPnlHKD, avgBuy, totalShares, firstDate, daysSince, bucket: lots[0].bucket };
+  });
+
+  // Sort groups by selected column
+  const gs = openGroupSort;
   const codes = Object.keys(groupMap).sort((a, b) => {
-    const valA = groupMap[a].reduce((s, t) => { const px = state.currentPrices[a] || t.buyprice; return s + toHKD(px * Math.abs(t.shares), a); }, 0);
-    const valB = groupMap[b].reduce((s, t) => { const px = state.currentPrices[b] || t.buyprice; return s + toHKD(px * Math.abs(t.shares), b); }, 0);
-    return valB - valA;
+    const sa = groupStats[a], sb = groupStats[b];
+    let va, vb;
+    if      (gs.col === 'code')      { va = a; vb = b; return gs.dir * va.localeCompare(vb); }
+    else if (gs.col === 'bucket')    { va = sa.bucket; vb = sb.bucket; return gs.dir * va.localeCompare(vb); }
+    else if (gs.col === 'firstDate') { va = sa.firstDate; vb = sb.firstDate; return gs.dir * va.localeCompare(vb); }
+    else if (gs.col === 'days')      { va = sa.daysSince; vb = sb.daysSince; }
+    else if (gs.col === 'avgBuy')    { va = sa.avgBuy; vb = sb.avgBuy; }
+    else if (gs.col === 'shares')    { va = sa.totalShares; vb = sb.totalShares; }
+    else if (gs.col === 'pnlPct')    { va = sa.pnlPctGroup ?? -Infinity; vb = sb.pnlPctGroup ?? -Infinity; }
+    else if (gs.col === 'pnlAmt')    { va = sa.totalPnlHKD; vb = sb.totalPnlHKD; }
+    else                             { va = sa.weight; vb = sb.weight; } // default: weight
+    return gs.dir * (va - vb);
   });
 
   const thBg = 'background:#1a3a5c';
+  const oTh = (col, label) =>
+    `<th style="${thBg};cursor:pointer;user-select:none;white-space:nowrap" onclick="sortOpenTh('${col}')">${label}${openArrow(col)}</th>`;
   let html = `<table class="tbl"><tr>
-    <th>股票</th><th>桶</th><th>類型</th>
-    <th>最早買入</th><th style="text-align:center">持倉日</th>
-    <th>均買價</th><th>總股數</th>
+    ${oTh('code','股票')}${oTh('bucket','桶')}<th>類型</th>
+    ${oTh('firstDate','最早買入')}${oTh('days','持倉日')}
+    ${oTh('avgBuy','均買價')}${oTh('shares','總股數')}
     <th style="${thBg}">現價</th>
-    <th style="${thBg}">盈虧%</th>
-    <th style="${thBg}">浮動金額</th>
-    <th style="${thBg};white-space:nowrap">佔比%</th>
+    ${oTh('pnlPct','盈虧%')}
+    ${oTh('pnlAmt','浮動金額')}
+    ${oTh('weight','佔比%')}
     <th>止蝕</th><th>目標</th><th>操作</th></tr>`;
 
   codes.forEach(code => {
@@ -2014,24 +2054,15 @@ function renderOpenPositions() {
     const isExpanded = expandedGroups.has(code);
     const curr = state.currentPrices[code] || null;
 
-    // Aggregate calculations
-    const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
-    const totalCostNative = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares || 0), 0);
-    const avgBuy = totalShares > 0 ? totalCostNative / totalShares : 0;
-    const dir = tradeDir(lots[0]);
-    const pnlPctGroup = curr ? (dir * (curr - avgBuy) / avgBuy * 100) : null;
-    const totalPnlHKD = lots.reduce((s, t) => {
-      const raw = calcPnlAmt(t, curr);
-      return s + (raw !== null ? toHKD(raw, t.code) : 0);
-    }, 0);
-    const posValHKD = toHKD((curr || avgBuy) * totalShares, code);
-    const weightPct = totalHKD > 0 ? (posValHKD / totalHKD * 100).toFixed(1) : '—';
+    // Reuse pre-computed aggregate stats (live price may differ, so recompute P&L)
+    const { weight: weightNum, avgBuy, totalShares, firstDate, daysSince } = groupStats[code];
+    const pnlPctGroup = curr ? (tradeDir(lots[0]) * (curr - avgBuy) / avgBuy * 100) : null;
+    const totalPnlHKD = lots.reduce((s, t) => { const r = calcPnlAmt(t, curr); return s + (r !== null ? toHKD(r, t.code) : 0); }, 0);
+    const weightPct = weightNum.toFixed(1);
     const pnlColor = pnlPctGroup > 0 ? 'var(--green)' : pnlPctGroup < 0 ? 'var(--red)' : 'inherit';
-    const weightColor = parseFloat(weightPct) > 15 ? 'color:var(--amber);font-weight:700' : 'color:var(--blue-mid);font-weight:700';
+    const weightColor = weightNum > 15 ? 'color:var(--amber);font-weight:700' : 'color:var(--blue-mid);font-weight:700';
     const bucket = lots[0].bucket;
     const typeLabel = lots.every(t => t.type === lots[0].type) ? lots[0].type : '多類型';
-    const firstDate = lots[0].buydate || '—';
-    const daysSince = lots[0].buydate ? Math.round((new Date() - new Date(lots[0].buydate)) / 86400000) : '—';
     const curSymLabel = getCurrency(code) !== 'HKD' ? `<br><span style="font-size:10px;font-weight:400;color:#999">${getCurrencyLabel(code)}換算</span>` : '';
 
     // ── SUMMARY ROW ──────────────────────────────────────────
@@ -3159,6 +3190,13 @@ function holdDaysCalc(t) {
   return Math.max(0, Math.round(ms / 86400000));
 }
 
+let monthlySort = { col: 'month', dir: -1 }; // default: newest first
+function sortMonthlyTh(col) {
+  if (monthlySort.col === col) monthlySort.dir *= -1;
+  else { monthlySort.col = col; monthlySort.dir = col === 'month' ? -1 : 1; }
+  renderMonthlyPerf();
+}
+
 function renderMonthlyPerf() {
   const el = document.getElementById('monthly-table');
   if (!el) return;
@@ -3168,85 +3206,96 @@ function renderMonthlyPerf() {
     return;
   }
 
-  // Group by sell month (YYYY-MM)
+  // Group by sell month (YYYY-MM) and pre-compute all stats
   const byMonth = {};
   closed.forEach(t => {
     const m = t.selldate.substring(0, 7);
     if (!byMonth[m]) byMonth[m] = [];
     byMonth[m].push(t);
   });
-  const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
 
-  const thStyle = 'padding:8px 10px;font-size:11px;white-space:nowrap;text-align:center;border-bottom:2px solid var(--gray-mid)';
-  const tdStyle = (align='right') => `padding:7px 10px;font-size:12px;text-align:${align};white-space:nowrap;border-bottom:1px solid var(--gray)`;
+  const avg = arr => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null;
+  const nullMin = (a, b) => { if (a === null) return b; if (b === null) return a; return Math.min(a,b); };
 
-  let html = `<table class="tbl" style="min-width:900px;border-collapse:collapse">
-  <thead><tr style="background:var(--blue);color:#fff">
-    <th style="${thStyle}">Month</th>
-    <th style="${thStyle}">Total<br>Trades</th>
-    <th style="${thStyle}">Win %</th>
-    <th style="${thStyle}">Avg Gain</th>
-    <th style="${thStyle}">Avg Loss</th>
-    <th style="${thStyle}">Largest<br>Gain</th>
-    <th style="${thStyle}">Largest<br>Loss</th>
-    <th style="${thStyle}">Avg Gain<br>Days</th>
-    <th style="${thStyle}">Avg Loss<br>Days</th>
-    <th style="${thStyle}">Reward/<br>Risk</th>
-    <th style="${thStyle}">Total Cost<br>(HK$)</th>
-    <th style="${thStyle}">P/L<br>(HK$)</th>
-    <th style="${thStyle}">Strategy<br>Result (adj)</th>
-    <th style="${thStyle};min-width:180px;text-align:left">Comments</th>
-  </tr></thead><tbody>`;
-
-  months.forEach(month => {
+  // Build stats rows
+  const rows = Object.keys(byMonth).map(month => {
     const trades = byMonth[month];
     const wins   = trades.filter(t => (calcRetPct(t) || 0) > 0);
     const losses = trades.filter(t => (calcRetPct(t) || 0) <= 0);
     const total  = trades.length;
-
-    const avg = arr => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null;
     const winPcts  = wins.map(t => calcRetPct(t));
     const lossPcts = losses.map(t => calcRetPct(t));
-
     const avgGain    = avg(winPcts);
     const avgLoss    = avg(lossPcts);
     const largestGain = wins.length   ? Math.max(...winPcts)  : null;
     const largestLoss = losses.length ? Math.min(...lossPcts) : null;
     const avgGainDays = avg(wins.filter(t=>holdDaysCalc(t)!==null).map(t=>holdDaysCalc(t)));
     const avgLossDays = avg(losses.filter(t=>holdDaysCalc(t)!==null).map(t=>holdDaysCalc(t)));
-    const winRate    = total ? wins.length / total : 0;
-    const rr         = (avgGain !== null && avgLoss && avgLoss !== 0)
-                       ? Math.abs(avgGain / avgLoss) : null;
-
-    const totalCostHKD = trades.reduce((s, t) =>
-      s + toHKD(t.buyprice * Math.abs(t.shares || 0), t.code), 0);
-    // Net P/L = gross P/L minus all fees (buy+sell per trade)
-    const plHKD = trades.reduce((s, t) => {
-      const net = calcNetPlHKD(t);
-      return s + (net !== null ? net : 0);
-    }, 0);
+    const winRate     = total ? wins.length / total : 0;
+    const rr          = (avgGain !== null && avgLoss && avgLoss !== 0) ? Math.abs(avgGain / avgLoss) : null;
+    const totalCostHKD = trades.reduce((s, t) => s + toHKD(t.buyprice * Math.abs(t.shares || 0), t.code), 0);
+    const plHKD = trades.reduce((s, t) => { const n = calcNetPlHKD(t); return s + (n !== null ? n : 0); }, 0);
     const totalFeesHKD = trades.reduce((s, t) => s + calcFeeHKD(t, 2), 0);
-
-    // Re-classify wins/losses based on net P/L for accuracy
-    const winsNet   = trades.filter(t => (calcNetPlHKD(t) || 0) > 0);
-    const lossesNet = trades.filter(t => (calcNetPlHKD(t) || 0) <= 0);
+    const winsNet    = trades.filter(t => (calcNetPlHKD(t) || 0) > 0);
     const winRateNet = total ? winsNet.length / total : 0;
+    const stratResult = (avgGain !== null && avgLoss !== null) ? winRateNet * avgGain + (1 - winRateNet) * avgLoss : null;
+    return { month, total, wins: wins.length, losses: losses.length, winRate, avgGain, avgLoss,
+             largestGain, largestLoss, avgGainDays, avgLossDays, rr, totalCostHKD, plHKD, totalFeesHKD, stratResult };
+  });
 
-    // Strategy Result (adj) = expectancy per trade = WinRate*AvgGain + LossRate*AvgLoss
-    const stratResult = (avgGain !== null && avgLoss !== null)
-      ? winRateNet * avgGain + (1 - winRateNet) * avgLoss : null;
+  // Sort rows
+  const s = monthlySort;
+  const nullVal = s.dir > 0 ? -Infinity : Infinity;
+  rows.sort((a, b) => {
+    let va = a[s.col], vb = b[s.col];
+    if (s.col === 'month') return s.dir > 0 ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = va !== null && va !== undefined ? va : nullVal;
+    vb = vb !== null && vb !== undefined ? vb : nullVal;
+    return s.dir * (va - vb);
+  });
 
-    const pct = (v, dec=1) => v !== null ? `${v>=0?'+':''}${v.toFixed(dec)}%` : '—';
+  // Sort arrow helper
+  const mArrow = col => {
+    if (monthlySort.col !== col) return '<span style="opacity:0.3;font-size:10px"> ⇅</span>';
+    return monthlySort.dir > 0 ? ' ▲' : ' ▼';
+  };
+  const thS = (col, label, br='') => {
+    const base = 'padding:8px 10px;font-size:11px;white-space:nowrap;text-align:center;border-bottom:2px solid var(--gray-mid);cursor:pointer;user-select:none';
+    return `<th style="${base}" onclick="sortMonthlyTh('${col}')">${label}${br?'<br>':''}${br}${mArrow(col)}</th>`;
+  };
+  const tdStyle = (align='right') => `padding:7px 10px;font-size:12px;text-align:${align};white-space:nowrap;border-bottom:1px solid var(--gray)`;
+  const pct = (v, dec=1) => v !== null ? `${v>=0?'+':''}${v.toFixed(dec)}%` : '—';
+
+  let html = `<table class="tbl" style="min-width:900px;border-collapse:collapse">
+  <thead><tr style="background:var(--blue);color:#fff">
+    ${thS('month','Month')}
+    ${thS('total','Total','Trades')}
+    ${thS('winRate','Win %')}
+    ${thS('avgGain','Avg Gain')}
+    ${thS('avgLoss','Avg Loss')}
+    ${thS('largestGain','Largest','Gain')}
+    ${thS('largestLoss','Largest','Loss')}
+    ${thS('avgGainDays','Avg Gain','Days')}
+    ${thS('avgLossDays','Avg Loss','Days')}
+    ${thS('rr','Reward/','Risk')}
+    ${thS('totalCostHKD','Total Cost','(HK$)')}
+    ${thS('plHKD','P/L','(HK$)')}
+    ${thS('stratResult','Strategy','Result (adj)')}
+    <th style="padding:8px 10px;font-size:11px;white-space:nowrap;text-align:left;border-bottom:2px solid var(--gray-mid);min-width:180px">Comments</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const { month, total, wins, losses, winRate, avgGain, avgLoss, largestGain, largestLoss,
+            avgGainDays, avgLossDays, rr, totalCostHKD, plHKD, totalFeesHKD, stratResult } = r;
     const plColor  = plHKD >= 0 ? 'var(--green)' : 'var(--red)';
     const srColor  = stratResult !== null ? (stratResult >= 0 ? 'var(--green)' : 'var(--red)') : '#888';
     const comment  = (state.monthlyComments && state.monthlyComments[month]) || '';
-
     html += `<tr>
       <td style="${tdStyle('center')}"><strong>${month}</strong></td>
       <td style="${tdStyle()}">${total}</td>
       <td style="${tdStyle()};color:${winRate>=0.5?'var(--green)':'var(--red)'};font-weight:700">
         ${(winRate*100).toFixed(1)}%<br>
-        <span style="font-size:10px;color:var(--gray-dark);font-weight:400">${wins.length}W / ${losses.length}L</span>
+        <span style="font-size:10px;color:var(--gray-dark);font-weight:400">${wins}W / ${losses}L</span>
       </td>
       <td style="${tdStyle()};color:var(--green)">${pct(avgGain)}</td>
       <td style="${tdStyle()};color:var(--red)">${pct(avgLoss)}</td>
@@ -3264,8 +3313,7 @@ function renderMonthlyPerf() {
       <td style="${tdStyle()};color:${srColor};font-weight:700">${pct(stratResult)}</td>
       <td style="${tdStyle('left')}">
         <div style="display:flex;flex-direction:column;gap:4px">
-          <textarea id="mc-${month}"
-            placeholder="備注..."
+          <textarea id="mc-${month}" placeholder="備注..."
             style="width:100%;min-width:150px;min-height:54px;padding:4px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px;background:var(--bg);resize:vertical;line-height:1.4">${comment.replace(/</g,'&lt;')}</textarea>
           <button onclick="saveMonthlyComment('${month}')"
             style="background:var(--blue);color:#fff;border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;align-self:flex-end">💾 儲存</button>

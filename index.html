@@ -2067,12 +2067,10 @@ function renderOpenPositions() {
 
     // ── SUMMARY ROW ──────────────────────────────────────────
     html += `<tr style="background:var(--gray);border-left:3px solid var(--blue)">
-      <td>
-        ${hasMultiple
+      <td style="white-space:nowrap">${hasMultiple
           ? `<span onclick="toggleGroup('${code}')" style="cursor:pointer;color:var(--blue);font-weight:700;user-select:none;margin-right:2px">${isExpanded ? '▾' : '›'}</span>`
           : '<span style="display:inline-block;width:12px"></span>'
-        }<strong>${code}</strong>
-        ${hasMultiple ? `<span style="font-size:10px;background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;margin-left:4px">${lots.length}筆</span>` : ''}
+        }<strong>${code}</strong>${hasMultiple ? `<span style="font-size:10px;background:var(--blue);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;vertical-align:middle">${lots.length}筆</span>` : ''}
       </td>
       <td><span class="badge badge-${bucket.toLowerCase()}">${bucket}</span></td>
       <td style="font-size:12px">${typeLabel}</td>
@@ -2099,11 +2097,11 @@ function renderOpenPositions() {
       <td style="color:var(--gray-dark)">${hasMultiple ? '—' : (lots[0].target || '—')}</td>
       <td style="white-space:nowrap">
         ${hasMultiple
-          ? `<span style="font-size:11px;color:var(--gray-dark)">展開查看各筆</span>`
-          : `<button class="btn btn-ghost btn-sm" onclick="editTrade(${lots[0].id})">✏️</button>
-             <button class="btn btn-green btn-sm" onclick="addToTrade(${lots[0].id})" style="margin-left:2px" title="加倉">➕</button>
-             <button class="btn btn-amber btn-sm" onclick="closeTrade(${lots[0].id})" style="margin-left:2px">平倉</button>
-             <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${lots[0].id})" style="margin-left:2px">刪</button>`
+          ? ''
+          : `<button class="btn btn-ghost btn-sm" onclick="editTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
+             <button class="btn btn-green btn-sm" onclick="addToTrade(${lots[0].id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
+             <button class="btn btn-amber btn-sm" onclick="closeTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+             <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
         }
       </td>
     </tr>`;
@@ -2145,10 +2143,10 @@ function renderOpenPositions() {
           </td>
           <td style="color:var(--green);font-size:12px">${t.target || '—'}</td>
           <td style="white-space:nowrap">
-            <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})">✏️</button>
-            <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" style="margin-left:2px" title="加倉">➕</button>
-            <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" style="margin-left:2px">平倉</button>
-            <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" style="margin-left:2px">刪</button>
+            <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})" title="編輯" style="padding:2px 5px">✏️</button>
+            <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
+            <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>
           </td>
         </tr>`;
       });

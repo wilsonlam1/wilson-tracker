@@ -867,6 +867,7 @@
 
   <!-- Today's snapshot entry -->
   <div class="card">
+    <div id="dp-edit-banner" style="display:none;background:var(--blue);color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;margin-bottom:10px"></div>
     <div class="card-title">📈 記錄今日表現</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <div style="flex:0 0 140px">
@@ -1101,7 +1102,16 @@ let state = {
   qqqHistory: [], // accumulated QQQ daily prices for MA/RSI (auto-score)
 };
 
-function save() { localStorage.setItem('wilson_tracker', JSON.stringify(state)); }
+let _autoSyncTimer = null;
+function save() {
+  localStorage.setItem('wilson_tracker', JSON.stringify(state));
+  // Auto-push to cloud after 5s debounce
+  if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
+  _autoSyncTimer = setTimeout(() => {
+    const { token, id } = getGistCreds();
+    if (token && id) pushToCloud(true);
+  }, 5000);
+}
 function load() {
   const d = localStorage.getItem('wilson_tracker');
   if (d) state = JSON.parse(d);
@@ -1256,6 +1266,8 @@ function showTab(name) {
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   event.target.classList.add('active');
+  // Auto weekly scoring when score tab is opened
+  if (name === 'score') setTimeout(autoScore, 500);
 }
 
 // ============================================================
@@ -2413,6 +2425,10 @@ function setSyncStatus(msg, isError) {
   const el = document.getElementById('syncStatus');
   if (el) { el.textContent = msg; el.style.color = isError ? 'var(--red)' : 'var(--green)'; }
 }
+function setFloatSync(icon, color) {
+  const el = document.getElementById('float-sync-label');
+  if (el) { el.textContent = icon; el.style.color = color || '#888'; }
+}
 function getGistCreds() {
   const token = (document.getElementById('jsonbinKey') && document.getElementById('jsonbinKey').value.trim())
                 || localStorage.getItem('jsonbin_key') || '';
@@ -2449,10 +2465,11 @@ async function createJsonBin() {
     setSyncStatus('❌ 建立失敗：' + e.message, true);
   }
 }
-async function pushToCloud() {
+async function pushToCloud(silent = false) {
   const { token, id } = getGistCreds();
-  if (!token || !id) { setSyncStatus('請先填入 Token 及 Gist ID', true); return; }
-  setSyncStatus('⏳ 推送中...', false);
+  if (!token || !id) { if (!silent) setSyncStatus('請先填入 Token 及 Gist ID', true); return; }
+  if (!silent) setSyncStatus('⏳ 推送中...', false);
+  setFloatSync('⏳', '#888');
   try {
     const r = await fetch(`https://api.github.com/gists/${id}`, {
       method: 'PATCH',
@@ -2462,9 +2479,11 @@ async function pushToCloud() {
     });
     if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
     const now = new Date().toLocaleString('zh-HK');
-    setSyncStatus(`✅ 已推送到雲端 (${now})`, false);
+    if (!silent) setSyncStatus(`✅ 已推送到雲端 (${now})`, false);
+    setFloatSync('☁️✅', 'var(--green)');
   } catch(e) {
-    setSyncStatus('❌ 推送失敗：' + e.message, true);
+    if (!silent) setSyncStatus('❌ 推送失敗：' + e.message, true);
+    setFloatSync('☁️❌', 'var(--red)');
   }
 }
 async function pullFromCloud() {
@@ -2804,6 +2823,8 @@ function saveDailyPerf() {
   dpChanges = [];
   document.getElementById('dp-changes-list').innerHTML = '';
   document.getElementById('dp-note').value = '';
+  const editBanner = document.getElementById('dp-edit-banner');
+  if (editBanner) editBanner.style.display = 'none';
   renderDailyHistory();
   renderDailyComparison();
   showToast(`${date} 每日表現已儲存 ✅`);
@@ -2974,8 +2995,19 @@ function dpLoadEdit(date) {
       <button onclick="dpRemoveChange(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
     list.appendChild(row);
   });
+  // Show editing banner + scroll to form
+  const editBanner = document.getElementById('dp-edit-banner');
+  if (editBanner) { editBanner.textContent = `✏️ 正在編輯：${date}　修改後請按「💾 儲存今日記錄」`; editBanner.style.display = 'block'; }
+  const dpCard = document.getElementById('dp-date').closest
+    ? document.getElementById('dp-date').closest('.card')
+    : null;
+  if (dpCard) {
+    dpCard.style.outline = '2px solid var(--blue)';
+    dpCard.style.outlineOffset = '2px';
+    dpCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => { dpCard.style.outline = ''; dpCard.style.outlineOffset = ''; }, 4000);
+  }
   showToast(`已載入 ${date} 記錄，修改後按儲存`);
-  document.getElementById('tab-daily').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function dpDeleteEntry(date) {
@@ -2987,5 +3019,14 @@ function dpDeleteEntry(date) {
   showToast(`${date} 記錄已刪除`);
 }
 </script>
+
+<!-- Floating cloud sync buttons (always visible, mobile-friendly) -->
+<div style="position:fixed;bottom:20px;right:16px;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:6px">
+  <button onclick="pushToCloud()" title="推送到雲端"
+    style="width:52px;height:52px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">☁️</button>
+  <button onclick="pullFromCloud()" title="從雲端載入"
+    style="width:52px;height:52px;border-radius:50%;border:none;background:var(--teal);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">⬇️</button>
+  <div id="float-sync-label" style="font-size:11px;color:#888;text-align:center;line-height:1.2"></div>
+</div>
 </body>
 </html>

@@ -2944,7 +2944,9 @@ function renderDailyHistory() {
     const pct = (prev && prev.total) ? (delta / prev.total * 100).toFixed(1) : null;
     const changesHtml = r.changes && r.changes.length
       ? r.changes.map(c => `<span style="color:${typeColor[c.type]||'#555'};font-size:11px">${typeLabel[c.type]||''} ${c.text}</span>`).join('<br>')
-      : '<span style="color:#aaa;font-size:11px">無</span>';
+      : '';
+    const noteHtml = r.note ? `<div style="font-size:10px;color:var(--gray-dark);margin-top:${changesHtml?'4px':'0'}">📝 ${r.note}</div>` : '';
+    const cellContent = changesHtml || noteHtml ? changesHtml + noteHtml : '<span style="color:#aaa;font-size:11px">無</span>';
     html += `<tr>
       <td style="white-space:nowrap"><strong>${r.date}</strong></td>
       <td style="text-align:right">HK$${Math.round(r.total).toLocaleString()}</td>
@@ -2956,7 +2958,7 @@ function renderDailyHistory() {
       ${dpBucketCell(r.b, prev?.b)}
       ${dpBucketCell(r.c, prev?.c)}
       ${dpBucketCell(r.d, prev?.d)}
-      <td style="font-size:11px;max-width:160px">${changesHtml}</td>
+      <td style="font-size:11px;max-width:160px">${cellContent}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-sm" onclick="dpLoadEdit('${r.date}')">✏️</button>
         <button class="btn btn-ghost btn-sm" onclick="dpDeleteEntry('${r.date}')" style="color:var(--red);margin-left:2px">🗑️</button>

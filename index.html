@@ -172,14 +172,14 @@
 </header>
 <nav>
   <button class="active" onclick="showTab('dashboard')">🏠 今日狀態</button>
+  <button onclick="showTab('trades')">📝 交易記錄</button>
+  <button onclick="showTab('daily')">📈 每日表現</button>
+  <button onclick="showTab('portfolio')">💼 持倉管理</button>
   <button onclick="showTab('score')">📊 每週評分</button>
   <button onclick="showTab('rules')">📐 建倉規則</button>
-  <button onclick="showTab('portfolio')">💼 持倉管理</button>
-  <button onclick="showTab('trades')">📝 交易記錄</button>
   <button onclick="showTab('review')">🔍 每週回顧</button>
-  <button onclick="showTab('history')">📅 歷史記錄</button>
-  <button onclick="showTab('daily')">📈 每日表現</button>
   <button onclick="showTab('monthly')">📆 每月表現</button>
+  <button onclick="showTab('history')">⚙️ 設定</button>
 </nav>
 
 <main>
@@ -747,7 +747,10 @@
   </div>
 
   <div class="card">
-    <div class="card-title">✅ 已平倉記錄</div>
+    <div class="card-title" style="justify-content:space-between">
+      <span>✅ 已平倉記錄</span>
+      <button class="btn btn-ghost btn-sm" onclick="exportClosedCSV()" style="font-size:12px">📥 匯出CSV</button>
+    </div>
     <div id="closedTrades"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div></div>
   </div>
 </div>
@@ -2099,8 +2102,8 @@ function renderOpenPositions() {
         ${hasMultiple
           ? ''
           : `<button class="btn btn-ghost btn-sm" onclick="editTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
-             <button class="btn btn-green btn-sm" onclick="addToTrade(${lots[0].id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
-             <button class="btn btn-amber btn-sm" onclick="closeTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+             <button class="btn btn-ghost btn-sm" onclick="addToTrade(${lots[0].id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
+             <button class="btn btn-ghost btn-sm" onclick="closeTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
              <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
         }
       </td>
@@ -2144,8 +2147,8 @@ function renderOpenPositions() {
           <td style="color:var(--green);font-size:12px">${t.target || '—'}</td>
           <td style="white-space:nowrap">
             <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})" title="編輯" style="padding:2px 5px">✏️</button>
-            <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
-            <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+            <button class="btn btn-ghost btn-sm" onclick="addToTrade(${t.id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeTrade(${t.id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
             <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>
           </td>
         </tr>`;
@@ -2185,6 +2188,34 @@ function exportOpenCSV() {
   a.href = url; a.download = `持倉記錄_${today}.csv`;
   a.click(); URL.revokeObjectURL(url);
   showToast(`已匯出 ${open.length} 筆持倉記錄 ✅`);
+}
+
+function exportClosedCSV() {
+  const closed = state.trades.filter(t => t.status === 'closed');
+  if (!closed.length) { showToast('暫無已平倉記錄'); return; }
+  const headers = ['股票代碼','桶','類型','買入日','賣出日','持倉天數','買入價','賣出價','回報%','P&L(HKD,扣手續費)','手續費(HKD)','備注'];
+  const rows = closed.map(t => {
+    const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '';
+    const retPct = calcRetPct(t);
+    const netHKD = calcNetPlHKD(t);
+    const feeHKD = calcFeeHKD(t, 2);
+    return [
+      t.code, t.bucket, t.type || '', t.buydate || '', t.selldate || '', days,
+      t.buyprice, t.sellprice || '',
+      retPct !== null ? retPct.toFixed(1) : '',
+      netHKD !== null ? Math.round(netHKD) : '',
+      Math.round(feeHKD),
+      (t.note || '').replace(/,/g,' ')
+    ];
+  });
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `已平倉記錄_${today}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast(`已匯出 ${closed.length} 筆已平倉記錄 ✅`);
 }
 
 function renderClosedTrades() {

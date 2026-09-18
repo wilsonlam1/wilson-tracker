@@ -1964,74 +1964,165 @@ function sortTrades(arr, s) {
   });
 }
 
+// Tracks which stock groups are expanded to show individual lots
+let expandedGroups = new Set();
+function toggleGroup(code) {
+  if (expandedGroups.has(code)) expandedGroups.delete(code);
+  else expandedGroups.add(code);
+  renderOpenPositions();
+}
+
 function renderOpenPositions() {
   const open = state.trades.filter(t => t.status === 'open');
   const el = document.getElementById('openPositions');
   if (!open.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉記錄</div>'; renderDashPnL(); return; }
-  const sorted = sortTrades(open, openSort);
   const tid = 'open';
 
-  // Calculate total open position value in HKD (using current price if available, else cost)
+  // Total portfolio value for weight %
   const totalHKD = open.reduce((sum, t) => {
     const px = state.currentPrices[t.code] || t.buyprice;
     return sum + toHKD(px * Math.abs(t.shares), t.code);
   }, 0);
 
+  // Group by code, preserving order of first appearance (sorted by first buydate desc)
+  const groupMap = {};
+  open.forEach(t => {
+    if (!groupMap[t.code]) groupMap[t.code] = [];
+    groupMap[t.code].push(t);
+  });
+  // Sort groups by total position weight desc
+  const codes = Object.keys(groupMap).sort((a, b) => {
+    const valA = groupMap[a].reduce((s, t) => { const px = state.currentPrices[a] || t.buyprice; return s + toHKD(px * Math.abs(t.shares), a); }, 0);
+    const valB = groupMap[b].reduce((s, t) => { const px = state.currentPrices[b] || t.buyprice; return s + toHKD(px * Math.abs(t.shares), b); }, 0);
+    return valB - valA;
+  });
+
+  const thBg = 'background:#1a3a5c';
   let html = `<table class="tbl"><tr>
-    ${thSort('股票','code',tid)}${thSort('桶','bucket',tid)}${thSort('類型','type',tid)}
-    ${thSort('買入日','buydate',tid)}${thSort('持倉日','days',tid)}
-    ${thSort('買入價','buyprice',tid)}${thSort('股數','shares',tid)}
-    <th style="background:#1a3a5c">現價</th>
-    <th style="background:#1a3a5c;cursor:pointer;user-select:none" onclick="sortTh('pnlPct','open')">盈虧%${sortArrow('pnlPct',tid)}</th>
-    <th style="background:#1a3a5c;cursor:pointer;user-select:none" onclick="sortTh('pnlAmt','open')">浮動金額${sortArrow('pnlAmt',tid)}</th>
-    <th style="background:#1a3a5c;cursor:pointer;user-select:none;white-space:nowrap" onclick="sortTh('weight','open')">佔比%${sortArrow('weight',tid)}</th>
-    ${thSort('止蝕','stop',tid)}${thSort('目標','target',tid)}<th>操作</th></tr>`;
-  sorted.forEach(t => {
-    const curr = state.currentPrices[t.code] || null;
-    const stopPct = t.stop ? (tradeDir(t) * (t.stop - t.buyprice) / t.buyprice * 100).toFixed(1) : '—';
-    const pnlPctVal = calcPnlPct(t, curr);
-    const pnlPct = pnlPctVal !== null ? pnlPctVal.toFixed(1) : null;
-    const pnlAmtRaw = calcPnlAmt(t, curr);
-    const pnlAmt = pnlAmtRaw !== null ? toHKD(pnlAmtRaw, t.code) : null;
-    const pnlColor = pnlPct > 0 ? 'var(--green)' : pnlPct < 0 ? 'var(--red)' : 'inherit';
-    const days = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '—';
-    const typeColor = t.type === 'Short' ? 'color:var(--red);font-weight:700' : t.type === 'VCP早' ? 'color:var(--amber);font-weight:700' : '';
-    // Position weight
-    const px = curr || t.buyprice;
-    const posHKD = toHKD(px * Math.abs(t.shares), t.code);
-    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100).toFixed(1) : '—';
-    const weightColor = parseFloat(weight) > 15 ? 'color:var(--amber);font-weight:700' : 'color:var(--blue-mid);font-weight:700';
-    html += `<tr>
-      <td><strong>${t.code}</strong></td>
-      <td><span class="badge badge-${t.bucket.toLowerCase()}">${t.bucket}</span></td>
-      <td style="${typeColor}">${t.type}</td>
-      <td>${t.buydate}</td>
-      <td style="text-align:center;font-weight:700">${days}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
-      <td>${t.buyprice}</td>
-      <td>${t.shares}</td>
+    <th>股票</th><th>桶</th><th>類型</th>
+    <th>最早買入</th><th style="text-align:center">持倉日</th>
+    <th>均買價</th><th>總股數</th>
+    <th style="${thBg}">現價</th>
+    <th style="${thBg}">盈虧%</th>
+    <th style="${thBg}">浮動金額</th>
+    <th style="${thBg};white-space:nowrap">佔比%</th>
+    <th>止蝕</th><th>目標</th><th>操作</th></tr>`;
+
+  codes.forEach(code => {
+    const lots = groupMap[code].slice().sort((a, b) => (a.buydate || '').localeCompare(b.buydate || ''));
+    const hasMultiple = lots.length > 1;
+    const isExpanded = expandedGroups.has(code);
+    const curr = state.currentPrices[code] || null;
+
+    // Aggregate calculations
+    const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
+    const totalCostNative = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares || 0), 0);
+    const avgBuy = totalShares > 0 ? totalCostNative / totalShares : 0;
+    const dir = tradeDir(lots[0]);
+    const pnlPctGroup = curr ? (dir * (curr - avgBuy) / avgBuy * 100) : null;
+    const totalPnlHKD = lots.reduce((s, t) => {
+      const raw = calcPnlAmt(t, curr);
+      return s + (raw !== null ? toHKD(raw, t.code) : 0);
+    }, 0);
+    const posValHKD = toHKD((curr || avgBuy) * totalShares, code);
+    const weightPct = totalHKD > 0 ? (posValHKD / totalHKD * 100).toFixed(1) : '—';
+    const pnlColor = pnlPctGroup > 0 ? 'var(--green)' : pnlPctGroup < 0 ? 'var(--red)' : 'inherit';
+    const weightColor = parseFloat(weightPct) > 15 ? 'color:var(--amber);font-weight:700' : 'color:var(--blue-mid);font-weight:700';
+    const bucket = lots[0].bucket;
+    const typeLabel = lots.every(t => t.type === lots[0].type) ? lots[0].type : '多類型';
+    const firstDate = lots[0].buydate || '—';
+    const daysSince = lots[0].buydate ? Math.round((new Date() - new Date(lots[0].buydate)) / 86400000) : '—';
+    const curSymLabel = getCurrency(code) !== 'HKD' ? `<br><span style="font-size:10px;font-weight:400;color:#999">${getCurrencyLabel(code)}換算</span>` : '';
+
+    // ── SUMMARY ROW ──────────────────────────────────────────
+    html += `<tr style="background:var(--gray);border-left:3px solid var(--blue)">
+      <td>
+        <strong>${code}</strong>
+        ${hasMultiple ? `<span style="font-size:10px;background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;margin-left:4px">${lots.length}筆</span>` : ''}
+      </td>
+      <td><span class="badge badge-${bucket.toLowerCase()}">${bucket}</span></td>
+      <td style="font-size:12px">${typeLabel}</td>
+      <td style="font-size:12px">${firstDate}</td>
+      <td style="text-align:center;font-weight:700">${daysSince}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+      <td style="font-size:12px;color:var(--gray-dark)">
+        ${avgBuy.toFixed(avgBuy < 10 ? 4 : 2)}
+        ${hasMultiple ? '<br><span style="font-size:10px;color:var(--blue)">加權均價</span>' : ''}
+      </td>
+      <td style="font-weight:700">${totalShares}</td>
       <td style="background:#f0f4fa;padding:4px">
         <input type="number" step="0.01" value="${curr || ''}" placeholder="輸入"
           style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px;font-weight:700"
-          onchange="updateCurrentPrice('${t.code}', this.value)">
+          onchange="updateCurrentPrice('${code}', this.value)">
       </td>
       <td style="background:#f0f4fa;font-weight:700;color:${pnlColor};text-align:center">
-        ${pnlPct !== null ? (pnlPct > 0 ? '+' : '') + pnlPct + '%' : '—'}
+        ${pnlPctGroup !== null ? (pnlPctGroup > 0 ? '+' : '') + pnlPctGroup.toFixed(1) + '%' : '—'}
       </td>
       <td style="background:#f0f4fa;font-weight:700;color:${pnlColor};text-align:right;font-size:12px">
-        ${pnlAmt !== null ? (pnlAmt >= 0 ? '+' : '') + 'HK$' + Math.round(pnlAmt).toLocaleString() +
-          (getCurrency(t.code) !== 'HKD' ? `<br><span style="font-size:10px;font-weight:400;color:#999">${getCurrencyLabel(t.code)}換算</span>` : '') : '—'}
+        ${curr ? (totalPnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(totalPnlHKD).toLocaleString() + curSymLabel : '—'}
       </td>
-      <td style="background:#f0f4fa;text-align:center;${weightColor}">${weight}%</td>
-      <td style="color:var(--red);font-size:12px">${t.stop || '—'}<br><span style="font-size:10px">${stopPct}%</span></td>
-      <td style="color:var(--green)">${t.target || '—'}</td>
+      <td style="background:#f0f4fa;text-align:center;${weightColor}">${weightPct}%</td>
+      <td style="color:var(--gray-dark);font-size:12px">${hasMultiple ? '—' : (lots[0].stop || '—')}</td>
+      <td style="color:var(--gray-dark)">${hasMultiple ? '—' : (lots[0].target || '—')}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})">✏️</button>
-        <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" style="margin-left:2px" title="加倉">➕</button>
-        <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" style="margin-left:2px">平倉</button>
-        <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" style="margin-left:2px">刪</button>
+        ${hasMultiple
+          ? `<button onclick="toggleGroup('${code}')"
+              style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;font-weight:700"
+              title="${isExpanded ? '收起' : '展開各筆交易'}">${isExpanded ? '▼ 收起' : '▶ 展開'}</button>`
+          : `<button class="btn btn-ghost btn-sm" onclick="editTrade(${lots[0].id})">✏️</button>
+             <button class="btn btn-green btn-sm" onclick="addToTrade(${lots[0].id})" style="margin-left:2px" title="加倉">➕</button>
+             <button class="btn btn-amber btn-sm" onclick="closeTrade(${lots[0].id})" style="margin-left:2px">平倉</button>
+             <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${lots[0].id})" style="margin-left:2px">刪</button>`
+        }
       </td>
     </tr>`;
+
+    // ── INDIVIDUAL LOT ROWS (when expanded) ──────────────────
+    if (hasMultiple && isExpanded) {
+      lots.forEach((t, li) => {
+        const lotPnlPctVal = calcPnlPct(t, curr);
+        const lotPnlPct = lotPnlPctVal !== null ? lotPnlPctVal.toFixed(1) : null;
+        const lotPnlAmtRaw = calcPnlAmt(t, curr);
+        const lotPnlHKD = lotPnlAmtRaw !== null ? toHKD(lotPnlAmtRaw, t.code) : null;
+        const lotColor = lotPnlPct > 0 ? 'var(--green)' : lotPnlPct < 0 ? 'var(--red)' : 'inherit';
+        const lotPosHKD = toHKD((curr || t.buyprice) * Math.abs(t.shares), t.code);
+        const lotWeight = totalHKD > 0 ? (lotPosHKD / totalHKD * 100).toFixed(1) : '—';
+        const lotWeightColor = parseFloat(lotWeight) > 15 ? 'color:var(--amber)' : 'color:var(--blue-mid)';
+        const lotDays = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '—';
+        const lotStop = t.stop ? (tradeDir(t) * (t.stop - t.buyprice) / t.buyprice * 100).toFixed(1) : null;
+        const typeColor = t.type === 'Short' ? 'color:var(--red)' : t.type === 'VCP早' ? 'color:var(--amber)' : '';
+        html += `<tr style="background:#f5f9ff;border-left:3px solid var(--blue)">
+          <td style="padding-left:20px;color:var(--gray-dark);font-size:12px">
+            └ <span style="color:var(--blue);font-weight:700">第${li+1}筆</span>
+          </td>
+          <td></td>
+          <td style="font-size:12px;${typeColor}">${t.type}</td>
+          <td style="font-size:12px">${t.buydate}</td>
+          <td style="text-align:center;font-size:12px">${lotDays}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+          <td style="font-size:12px">${t.buyprice}</td>
+          <td style="font-size:12px">${t.shares}</td>
+          <td style="background:#eef4fc;font-size:11px;color:var(--gray-dark);text-align:center">↑</td>
+          <td style="background:#eef4fc;font-weight:700;color:${lotColor};text-align:center;font-size:12px">
+            ${lotPnlPct !== null ? (lotPnlPct > 0 ? '+' : '') + lotPnlPct + '%' : '—'}
+          </td>
+          <td style="background:#eef4fc;font-weight:700;color:${lotColor};text-align:right;font-size:12px">
+            ${lotPnlHKD !== null ? (lotPnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(lotPnlHKD).toLocaleString() : '—'}
+          </td>
+          <td style="background:#eef4fc;text-align:center;font-size:12px;${lotWeightColor}">${lotWeight}%</td>
+          <td style="color:var(--red);font-size:11px">
+            ${t.stop || '—'}${lotStop ? `<br><span style="font-size:10px">${lotStop}%</span>` : ''}
+          </td>
+          <td style="color:var(--green);font-size:12px">${t.target || '—'}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-ghost btn-sm" onclick="editTrade(${t.id})">✏️</button>
+            <button class="btn btn-green btn-sm" onclick="addToTrade(${t.id})" style="margin-left:2px" title="加倉">➕</button>
+            <button class="btn btn-amber btn-sm" onclick="closeTrade(${t.id})" style="margin-left:2px">平倉</button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteTrade(${t.id})" style="margin-left:2px">刪</button>
+          </td>
+        </tr>`;
+      });
+    }
   });
+
   html += '</table>';
   el.innerHTML = html;
   renderDashPnL();

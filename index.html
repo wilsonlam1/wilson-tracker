@@ -2037,7 +2037,10 @@ function renderOpenPositions() {
     // ── SUMMARY ROW ──────────────────────────────────────────
     html += `<tr style="background:var(--gray);border-left:3px solid var(--blue)">
       <td>
-        <strong>${code}</strong>
+        ${hasMultiple
+          ? `<span onclick="toggleGroup('${code}')" style="cursor:pointer;color:var(--blue);font-weight:700;user-select:none;margin-right:2px">${isExpanded ? '▾' : '›'}</span>`
+          : '<span style="display:inline-block;width:12px"></span>'
+        }<strong>${code}</strong>
         ${hasMultiple ? `<span style="font-size:10px;background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;margin-left:4px">${lots.length}筆</span>` : ''}
       </td>
       <td><span class="badge badge-${bucket.toLowerCase()}">${bucket}</span></td>
@@ -2065,9 +2068,7 @@ function renderOpenPositions() {
       <td style="color:var(--gray-dark)">${hasMultiple ? '—' : (lots[0].target || '—')}</td>
       <td style="white-space:nowrap">
         ${hasMultiple
-          ? `<button onclick="toggleGroup('${code}')"
-              style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;font-weight:700"
-              title="${isExpanded ? '收起' : '展開各筆交易'}">${isExpanded ? '▼ 收起' : '▶ 展開'}</button>`
+          ? `<span style="font-size:11px;color:var(--gray-dark)">展開查看各筆</span>`
           : `<button class="btn btn-ghost btn-sm" onclick="editTrade(${lots[0].id})">✏️</button>
              <button class="btn btn-green btn-sm" onclick="addToTrade(${lots[0].id})" style="margin-left:2px" title="加倉">➕</button>
              <button class="btn btn-amber btn-sm" onclick="closeTrade(${lots[0].id})" style="margin-left:2px">平倉</button>
@@ -3262,12 +3263,12 @@ function renderMonthlyPerf() {
       </td>
       <td style="${tdStyle()};color:${srColor};font-weight:700">${pct(stratResult)}</td>
       <td style="${tdStyle('left')}">
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" id="mc-${month}" value="${comment.replace(/"/g,'&quot;')}"
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <textarea id="mc-${month}"
             placeholder="備注..."
-            style="flex:1;min-width:130px;padding:4px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px;background:var(--bg)">
+            style="width:100%;min-width:150px;min-height:54px;padding:4px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px;background:var(--bg);resize:vertical;line-height:1.4">${comment.replace(/</g,'&lt;')}</textarea>
           <button onclick="saveMonthlyComment('${month}')"
-            style="background:var(--blue);color:#fff;border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap">💾</button>
+            style="background:var(--blue);color:#fff;border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;align-self:flex-end">💾 儲存</button>
         </div>
       </td>
     </tr>`;

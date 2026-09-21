@@ -3848,6 +3848,7 @@ function agRenderDashboard() {
       <td style="white-space:nowrap">
         ${lots.length === 1
           ? `<button class="btn btn-ghost btn-sm" onclick="agEditTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
+             <button class="btn btn-ghost btn-sm" onclick="agAddToTrade(${lots[0].id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
              <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
              <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
           : `<span style="font-size:11px;color:var(--gray-dark)">${lots.length}筆</span>`}
@@ -3925,6 +3926,35 @@ function agDeleteTrade(id) {
   agSave(); agRenderAll(); showToast('記錄已刪除');
 }
 
+let agExpandedGroups = new Set();
+function agToggleGroup(code) {
+  agExpandedGroups.has(code) ? agExpandedGroups.delete(code) : agExpandedGroups.add(code);
+  agRenderOpenPositions();
+}
+
+function agAddToTrade(id) {
+  const t = agState.trades.find(t => t.id === id);
+  if (!t) return;
+  // Pre-fill the form for adding a lot to the same stock
+  document.getElementById('ag-t-code').value = t.code;
+  document.getElementById('ag-t-theme').value = t.theme || agState.currentTheme || '';
+  document.getElementById('ag-t-type').value = 'Add';
+  document.getElementById('ag-t-buydate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ag-t-buyprice').value = '';
+  document.getElementById('ag-t-shares').value = '';
+  document.getElementById('ag-t-stop').value = t.stop || '';
+  document.getElementById('ag-t-target').value = t.target || '';
+  document.getElementById('ag-t-note').value = '';
+  // Switch to trades tab and scroll to form
+  document.querySelectorAll('.ag-tab').forEach(x => x.style.display = 'none');
+  document.querySelectorAll('#nav-aggressive button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-ag-trades').style.display = 'block';
+  document.querySelectorAll('#nav-aggressive button')[1].classList.add('active');
+  document.getElementById('tab-ag-trades').querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('ag-t-buyprice').focus();
+  showToast(`加倉 ${t.code}：請填入買入價及股數`);
+}
+
 function agRenderOpenPositions() {
   const open = agState.trades.filter(t => t.status !== 'closed');
   const el = document.getElementById('ag-openPositions');
@@ -3935,43 +3965,92 @@ function agRenderOpenPositions() {
     const px = agState.currentPrices[code] || lots[0].buyprice;
     return s + agToHKD(px * lots.reduce((a, t) => a + Math.abs(t.shares), 0), code);
   }, 0);
-  let html = `<table class="tbl"><tr><th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th><th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th>比重%</th><th>操作</th></tr>`;
+  const thresh = agState.rebalanceThreshold || 25;
+  const BTNS = (id) => `<button class="btn btn-ghost btn-sm" onclick="agEditTrade(${id})" title="編輯" style="padding:2px 5px">✏️</button>
+    <button class="btn btn-ghost btn-sm" onclick="agAddToTrade(${id})" title="加倉" style="margin-left:2px;padding:2px 5px">➕</button>
+    <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+    <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`;
+
+  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
+    <th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th>
+    <th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th>比重%</th><th>操作</th></tr>`;
+
   codes.forEach(code => {
     const lots = open.filter(t => t.code === code);
+    const hasMultiple = lots.length > 1;
+    const isExpanded = agExpandedGroups.has(code);
     const curr = agState.currentPrices[code];
     const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
     const avgBuy = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares), 0) / totalShares;
     const px = curr || avgBuy;
     const posHKD = agToHKD(px * totalShares, code);
     const weight = totalHKD > 0 ? (posHKD / totalHKD * 100).toFixed(1) : '—';
-    const pnlHKD = curr ? lots.reduce((s, t) => s + (agToHKD(agCalcPnlAmt(t, curr) || 0, t.code)), 0) : null;
-    const pnlPct = curr ? (lots.reduce((s, t) => { const p = agCalcPnlPct(t, curr); return s + (p || 0); }, 0) / lots.length) : null;
-    const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
     const wNum = parseFloat(weight);
-    const thresh = agState.rebalanceThreshold || 25;
     const wColor = wNum > thresh ? 'var(--red)' : 'var(--blue-mid)';
-    html += `<tr style="background:var(--gray)">
-      <td style="white-space:nowrap"><strong>${code}</strong>${lots.length > 1 ? `<span style="font-size:10px;background:var(--purple);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px">${lots.length}筆</span>` : ''}</td>
-      <td style="font-size:11px;color:var(--purple)">${lots[0].theme || '—'}</td>
-      <td style="font-size:12px">${lots.every(t => t.type === lots[0].type) ? lots[0].type : '多'}</td>
-      <td style="font-size:12px">${lots[0].buydate}</td>
-      <td style="text-align:center">${lots[0].buydate ? Math.round((new Date() - new Date(lots[0].buydate)) / 86400000) : '—'}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
-      <td style="font-size:12px">${avgBuy.toFixed(avgBuy < 10 ? 4 : 2)}</td>
-      <td style="font-weight:700">${totalShares}</td>
-      <td style="background:#f0f4fa"><input type="number" step="0.01" value="${curr || ''}" placeholder="輸入" style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px" onchange="agUpdatePrice('${code}',this.value)"></td>
-      <td style="color:${pColor};font-weight:700">${pnlPct !== null ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%' : '—'}</td>
-      <td style="color:${pColor};font-weight:700;text-align:right;font-size:12px">${pnlHKD !== null ? (pnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(pnlHKD).toLocaleString() : '—'}</td>
-      <td style="text-align:center;font-weight:700;color:${wColor}">${weight}%${wNum > thresh ? ' ⚠️' : ''}</td>
-      <td style="white-space:nowrap">
-        ${lots.length === 1
-          ? `<button class="btn btn-ghost btn-sm" onclick="agEditTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
-             <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
-             <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
-          : `<span style="font-size:11px;color:var(--gray-dark)">多筆</span>`}
+    const pnlHKD = curr ? lots.reduce((s, t) => s + agToHKD(agCalcPnlAmt(t, curr) || 0, t.code), 0) : null;
+    const pnlPct = curr ? lots.reduce((s, t) => s + (agCalcPnlPct(t, curr) || 0), 0) / lots.length : null;
+    const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
+    const firstDate = lots.slice().sort((a,b) => (a.buydate||'').localeCompare(b.buydate||''))[0].buydate || '—';
+    const daysSince = firstDate !== '—' ? Math.round((new Date() - new Date(firstDate)) / 86400000) : '—';
+
+    // ── SUMMARY ROW ──
+    html += `<tr style="background:var(--gray);border-left:3px solid var(--purple)">
+      <td style="white-space:nowrap">${hasMultiple
+        ? `<span onclick="agToggleGroup('${code}')" style="cursor:pointer;color:var(--purple);font-weight:700;user-select:none;margin-right:2px">${isExpanded ? '▾' : '›'}</span>`
+        : '<span style="display:inline-block;width:12px"></span>'
+      }<strong>${code}</strong>${hasMultiple ? `<span style="font-size:10px;background:var(--purple);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;vertical-align:middle">${lots.length}筆</span>` : ''}
       </td>
+      <td style="font-size:11px;color:var(--purple)">${lots[0].theme || '—'}</td>
+      <td style="font-size:12px">${lots.every(t => t.type === lots[0].type) ? lots[0].type : '多類型'}</td>
+      <td style="font-size:12px">${firstDate}${hasMultiple ? '<br><span style="font-size:10px;color:var(--purple)">首筆</span>' : ''}</td>
+      <td style="text-align:center;font-weight:700">${daysSince}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+      <td style="font-size:12px;color:var(--gray-dark)">${avgBuy.toFixed(avgBuy < 10 ? 4 : 2)}${hasMultiple ? '<br><span style="font-size:10px;color:var(--purple)">加權均</span>' : ''}</td>
+      <td style="font-weight:700">${totalShares}</td>
+      <td style="background:#f0f4fa;padding:4px"><input type="number" step="0.01" value="${curr || ''}" placeholder="輸入"
+        style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px;font-weight:700"
+        onchange="agUpdatePrice('${code}',this.value)"></td>
+      <td style="background:#f0f4fa;font-weight:700;color:${pColor};text-align:center">
+        ${pnlPct !== null ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%' : '—'}
+      </td>
+      <td style="background:#f0f4fa;font-weight:700;color:${pColor};text-align:right;font-size:12px">
+        ${pnlHKD !== null ? (pnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(pnlHKD).toLocaleString() : '—'}
+      </td>
+      <td style="background:#f0f4fa;text-align:center;font-weight:700;color:${wColor}">${weight}%${wNum > thresh ? ' ⚠️' : ''}</td>
+      <td style="white-space:nowrap">${hasMultiple ? '' : BTNS(lots[0].id)}</td>
     </tr>`;
+
+    // ── EXPANDED INDIVIDUAL LOT ROWS ──
+    if (hasMultiple && isExpanded) {
+      lots.forEach((t, li) => {
+        const lotPx = curr || t.buyprice;
+        const lotPnlPct = curr ? agCalcPnlPct(t, curr) : null;
+        const lotPnlHKD = curr ? agToHKD(agCalcPnlAmt(t, curr) || 0, t.code) : null;
+        const lotColor = lotPnlHKD !== null ? (lotPnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
+        const lotPosHKD = agToHKD(lotPx * Math.abs(t.shares), t.code);
+        const lotWeight = totalHKD > 0 ? (lotPosHKD / totalHKD * 100).toFixed(1) : '—';
+        const tDays = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '—';
+        html += `<tr style="background:#f5f0ff;border-left:3px solid var(--purple)">
+          <td style="padding-left:20px;color:var(--gray-dark);font-size:12px">└ <span style="color:var(--purple);font-weight:700">第${li+1}筆</span></td>
+          <td></td>
+          <td style="font-size:12px">${t.type}</td>
+          <td style="font-size:12px">${t.buydate}</td>
+          <td style="text-align:center;font-size:12px">${tDays}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+          <td style="font-size:12px">${t.buyprice}</td>
+          <td style="font-size:12px">${t.shares}</td>
+          <td style="background:#eef0ff;font-size:11px;color:var(--gray-dark);text-align:center">↑</td>
+          <td style="background:#eef0ff;font-weight:700;color:${lotColor};text-align:center;font-size:12px">
+            ${lotPnlPct !== null ? (lotPnlPct >= 0 ? '+' : '') + lotPnlPct.toFixed(1) + '%' : '—'}
+          </td>
+          <td style="background:#eef0ff;font-weight:700;color:${lotColor};text-align:right;font-size:12px">
+            ${lotPnlHKD !== null ? (lotPnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(lotPnlHKD).toLocaleString() : '—'}
+          </td>
+          <td style="background:#eef0ff;text-align:center;font-size:12px;color:var(--blue-mid)">${lotWeight}%</td>
+          <td style="white-space:nowrap">${BTNS(t.id)}</td>
+        </tr>`;
+      });
+    }
   });
-  html += '</table>';
+  html += '</table></div>';
   el.innerHTML = html;
 }
 

@@ -32,6 +32,13 @@
   main { max-width: 1100px; margin: 0 auto; padding: 16px; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
+  .ag-tab { display: none; }
+  #nav-aggressive button { color:rgba(255,255,255,0.7);background:none;border:none;padding:10px 18px;cursor:pointer;font-size:13px;white-space:nowrap;border-bottom:3px solid transparent;transition:all 0.2s; }
+  #nav-aggressive button:hover { color:#fff;background:rgba(255,255,255,0.08); }
+  #nav-aggressive button.active { color:#fff;border-bottom-color:#F39C12;font-weight:600; }
+  #ag-mode-wrapper { padding:12px; }
+  #ag-mode-wrapper .card-title { color: var(--purple); }
+  .ag-rebal-alert { background:var(--red-light);border-left:4px solid var(--red);border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:13px; }
 
   /* CARDS */
   .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -168,9 +175,13 @@
 <header>
   <div>📈</div>
   <h1>Wilson 投資追蹤系統</h1>
-  <span class="date" id="headerDate"></span>
+  <button id="mode-toggle-btn" onclick="switchMode()"
+    style="margin-left:auto;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 14px;border-radius:16px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap;transition:all 0.2s">
+    🛡️ 保守 MODE
+  </button>
+  <span class="date" id="headerDate" style="margin-left:12px"></span>
 </header>
-<nav>
+<nav id="nav-conservative">
   <button class="active" onclick="showTab('dashboard')">🏠 今日狀態</button>
   <button onclick="showTab('trades')">📝 交易記錄</button>
   <button onclick="showTab('daily')">📈 每日表現</button>
@@ -180,6 +191,14 @@
   <button onclick="showTab('review')">🔍 每週回顧</button>
   <button onclick="showTab('monthly')">📆 每月表現</button>
   <button onclick="showTab('history')">⚙️ 設定</button>
+</nav>
+<nav id="nav-aggressive" style="display:none;background:#4A235A">
+  <button class="active" onclick="agShowTab('ag-dashboard')">🏠 今日狀態</button>
+  <button onclick="agShowTab('ag-trades')">📝 交易記錄</button>
+  <button onclick="agShowTab('ag-daily')">📈 每日表現</button>
+  <button onclick="agShowTab('ag-rebalance')">⚖️ 再平衡</button>
+  <button onclick="agShowTab('ag-quarterly')">📅 每季回顧</button>
+  <button onclick="agShowTab('ag-settings')">⚙️ 設定</button>
 </nav>
 
 <main>
@@ -961,6 +980,243 @@
 
 </main>
 
+<!-- =================== AGGRESSIVE MODE WRAPPER =================== -->
+<div id="ag-mode-wrapper" style="display:none;padding:12px">
+
+  <!-- AG TAB: 今日狀態 -->
+  <div id="tab-ag-dashboard" class="ag-tab">
+    <div id="ag-rebalance-alerts"></div>
+    <div class="grid-4" style="margin-bottom:10px">
+      <div class="stat-box" style="background:var(--purple-light);border-left:4px solid var(--purple)">
+        <div class="label">投資主題</div>
+        <div class="value" id="ag-dash-theme" style="font-size:20px;color:var(--purple)">—</div>
+        <div class="sub">🎯 進取 MODE</div>
+      </div>
+      <div class="stat-box stat-blue">
+        <div class="label">持倉股數</div>
+        <div class="value" id="ag-dash-positions">0</div>
+        <div class="sub" id="ag-dash-pos-sub">目標 ≤6</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">現金比例</div>
+        <div class="value" id="ag-dash-cash">—%</div>
+        <div class="sub" id="ag-dash-cash-target">目標 10%</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">浮動盈虧</div>
+        <div class="value" id="ag-dash-pnl" style="font-size:16px">—</div>
+        <div class="sub" id="ag-dash-pnl-pct">總持倉</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 持倉比重一覽</div>
+      <div id="ag-positions-overview"><div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div></div>
+    </div>
+  </div>
+
+  <!-- AG TAB: 交易記錄 -->
+  <div id="tab-ag-trades" class="ag-tab" style="display:none">
+    <div class="card">
+      <div class="card-title">➕ 新增交易記錄</div>
+      <div class="form-row-3">
+        <div class="form-group"><label>股票代碼</label><input id="ag-t-code" placeholder="例：NVDA, 9988.HK"></div>
+        <div class="form-group"><label>主題標籤</label><input id="ag-t-theme" placeholder="例：AI, 半導體"></div>
+        <div class="form-group"><label>交易類型</label>
+          <select id="ag-t-type">
+            <option value="Long">Long 買入</option>
+            <option value="Short">Short 沽空</option>
+            <option value="Add">加倉</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>買入日期</label><input type="date" id="ag-t-buydate"></div>
+        <div class="form-group"><label>買入價</label><input type="number" id="ag-t-buyprice" step="0.01"></div>
+        <div class="form-group"><label>股數</label><input type="number" id="ag-t-shares"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>止蝕位 (可選)</label><input type="number" id="ag-t-stop" step="0.01"></div>
+        <div class="form-group"><label>目標價 (可選)</label><input type="number" id="ag-t-target" step="0.01"></div>
+        <div class="form-group"><label>備注</label><input id="ag-t-note" placeholder="入市原因..."></div>
+      </div>
+      <button class="btn btn-green" onclick="agAddTrade()">➕ 加入記錄</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between">
+        <span>📋 持倉中</span>
+        <button class="btn btn-ghost btn-sm" onclick="agExportOpenCSV()" style="font-size:12px">📥 匯出CSV</button>
+      </div>
+      <div id="ag-openPositions"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between">
+        <span>✅ 已平倉記錄</span>
+        <button class="btn btn-ghost btn-sm" onclick="agExportClosedCSV()" style="font-size:12px">📥 匯出CSV</button>
+      </div>
+      <div id="ag-closedTrades"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div></div>
+    </div>
+  </div>
+
+  <!-- AG TAB: 每日表現 -->
+  <div id="tab-ag-daily" class="ag-tab" style="display:none">
+    <div class="card">
+      <div id="ag-dp-edit-banner" style="display:none;background:var(--purple);color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;margin-bottom:10px"></div>
+      <div class="card-title">📈 記錄今日表現</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:0 0 140px">
+          <label style="font-size:11px">日期</label>
+          <input type="date" id="ag-dp-date">
+        </div>
+        <div style="flex:0 0 160px">
+          <label style="font-size:11px">組合總值 (HK$)</label>
+          <input type="number" id="ag-dp-total" placeholder="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px">備注</label>
+        <textarea id="ag-dp-note" style="height:40px" placeholder="市場觀察、調倉原因..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="agSaveDailyPerf()">💾 儲存今日記錄</button>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 每日表現歷史</div>
+      <div id="ag-dp-history"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div></div>
+    </div>
+  </div>
+
+  <!-- AG TAB: 再平衡 -->
+  <div id="tab-ag-rebalance" class="ag-tab" style="display:none">
+    <div class="card">
+      <div class="card-title">⚖️ 持倉比重 &amp; 再平衡建議</div>
+      <div style="font-size:12px;color:var(--gray-dark);margin-bottom:12px">
+        目標平均比重 = (100% − 現金%) ÷ 持倉股數。超過再平衡閾值時系統提示減持。
+      </div>
+      <div id="ag-rebalance-table"><div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div></div>
+    </div>
+  </div>
+
+  <!-- AG TAB: 每季回顧 -->
+  <div id="tab-ag-quarterly" class="ag-tab" style="display:none">
+    <div class="card">
+      <div class="card-title">📅 每季回顧</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+        <div style="flex:0 0 120px">
+          <label style="font-size:11px">年份</label>
+          <select id="ag-q-year" style="width:100%"></select>
+        </div>
+        <div style="flex:0 0 120px">
+          <label style="font-size:11px">季度</label>
+          <select id="ag-q-quarter" style="width:100%">
+            <option value="Q1">Q1 (1–3月)</option>
+            <option value="Q2">Q2 (4–6月)</option>
+            <option value="Q3">Q3 (7–9月)</option>
+            <option value="Q4">Q4 (10–12月)</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="agLoadQuarterly()">📂 載入</button>
+      </div>
+
+      <div id="ag-q-stats" style="background:var(--purple-light);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:none"></div>
+
+      <div class="form-group">
+        <label>主題表現評估</label>
+        <textarea id="ag-q-theme-eval" style="height:80px" placeholder="這季主題（如AI）表現如何？哪些持倉貢獻最多/最少？"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="ag-q-change-theme" onchange="document.getElementById('ag-q-new-theme-row').style.display=this.checked?'block':'none'">
+        <label for="ag-q-change-theme" style="font-weight:600">下季換主題？</label>
+      </div>
+      <div id="ag-q-new-theme-row" class="form-group" style="display:none">
+        <label>新主題名稱</label>
+        <input id="ag-q-new-theme" placeholder="例：生技、半導體、能源">
+      </div>
+      <div class="form-group">
+        <label>下季策略</label>
+        <textarea id="ag-q-strategy" style="height:80px" placeholder="下季持倉調整計劃、目標倉位、預期走勢..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="agSaveQuarterly()">💾 儲存季度回顧</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 歷史季度回顧</div>
+      <div id="ag-quarterly-history"><div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無記錄</div></div>
+    </div>
+  </div>
+
+  <!-- AG TAB: 設定 -->
+  <div id="tab-ag-settings" class="ag-tab" style="display:none">
+    <div class="card">
+      <div class="card-title">🎯 進取MODE 設定</div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>投資主題</label>
+          <input id="ag-set-theme" placeholder="例：AI, 半導體" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>最多持倉股數</label>
+          <input type="number" id="ag-set-maxpos" value="6" min="1" max="20" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>現金目標 %</label>
+          <input type="number" id="ag-set-cash" value="10" min="0" max="50" step="1" oninput="agSaveSettings()">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>再平衡閾值 %</label>
+          <input type="number" id="ag-set-rebal" value="25" min="10" max="60" step="1" oninput="agSaveSettings()">
+          <div style="font-size:10px;color:var(--gray-dark);margin-top:3px">某持倉佔比超此值時提示</div>
+        </div>
+        <div class="form-group">
+          <label>美股手續費 (US$)</label>
+          <input type="number" id="ag-set-fee-us" value="2.05" step="0.01" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>港股手續費 (HK$)</label>
+          <input type="number" id="ag-set-fee-hk" value="55" step="0.5" oninput="agSaveSettings()">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>USD→HKD 匯率</label>
+          <input type="number" id="ag-set-usd" value="7.78" step="0.01" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>JPY→HKD 匯率</label>
+          <input type="number" id="ag-set-jpy" value="0.051" step="0.001" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>KRW→HKD 匯率</label>
+          <input type="number" id="ag-set-krw" value="0.0057" step="0.0001" oninput="agSaveSettings()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">☁️ 雲端同步 (共用保守MODE Gist)</div>
+      <div style="font-size:12px;color:var(--gray-dark);margin-bottom:10px">進取MODE數據存放於同一Gist的 <code>wilson_tracker_ag.json</code>，使用相同 Token 及 Gist ID。</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="agPushToCloud()">☁️ 推送到雲端</button>
+        <button class="btn btn-green" onclick="agPullFromCloud()">⬇️ 從雲端載入</button>
+      </div>
+      <div id="ag-syncStatus" style="font-size:12px;margin-top:8px;color:var(--gray-dark)"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚙️ 數據管理</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="agExportJSON()">📤 匯出數據 (JSON)</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('ag-importFile').click()">📥 匯入數據</button>
+        <input type="file" id="ag-importFile" accept=".json" style="display:none" onchange="agImportJSON(event)">
+        <button class="btn btn-red" onclick="if(confirm('確定清除進取MODE所有數據？'))agClearAll()">🗑️ 清除所有數據</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end ag-mode-wrapper -->
+
 <!-- ADD POSITION MODAL -->
 <div id="posModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:none;align-items:center;justify-content:center">
   <div style="background:white;border-radius:12px;padding:20px;width:380px;max-width:95vw">
@@ -1171,6 +1427,9 @@ window.onload = function() {
 
   // Load daily note
   document.getElementById('dailyNote').value = state.dailyNote || '';
+
+  // Apply mode last (aggressive mode will hide conservative content if needed)
+  if (currentMode === 'aggressive') applyMode();
 };
 
 function updateHeaderDate() {
@@ -3372,6 +3631,683 @@ function dpDeleteEntry(date) {
   renderDailyComparison();
   showToast(`${date} 記錄已刪除`);
 }
+
+// ============================================================
+// AGGRESSIVE MODE
+// ============================================================
+
+let currentMode = localStorage.getItem('wilson_mode') || 'conservative';
+
+let agState = {
+  trades: [], currentPrices: {}, currentTheme: 'AI',
+  maxPositions: 6, cashPct: 10, rebalanceThreshold: 25,
+  usdRate: 7.78, jpyRate: 0.051, krwRate: 0.0057,
+  fees: { us: 2.05, hk: 55 },
+  dailyPerf: [], quarterlyReviews: {},
+};
+let agTradeIdCounter = 1;
+
+function agLoad() {
+  const raw = localStorage.getItem('wilson_tracker_ag');
+  if (raw) { try { agState = JSON.parse(raw); } catch(e) {} }
+  agTradeIdCounter = agState.trades.length ? Math.max(...agState.trades.map(t => t.id)) + 1 : 1;
+}
+function agSave() {
+  localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
+  if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
+  _autoSyncTimer = setTimeout(() => {
+    const { token, id } = getGistCreds();
+    if (token && id) agPushToCloud(true);
+  }, 5000);
+}
+
+function switchMode() {
+  currentMode = currentMode === 'conservative' ? 'aggressive' : 'conservative';
+  localStorage.setItem('wilson_mode', currentMode);
+  applyMode();
+}
+
+function applyMode() {
+  const isAg = currentMode === 'aggressive';
+  document.getElementById('nav-conservative').style.display = isAg ? 'none' : 'flex';
+  document.getElementById('nav-aggressive').style.display = isAg ? 'flex' : 'none';
+  document.querySelector('main').style.display = isAg ? 'none' : 'block';
+  document.getElementById('ag-mode-wrapper').style.display = isAg ? 'block' : 'none';
+  const btn = document.getElementById('mode-toggle-btn');
+  if (isAg) {
+    btn.innerHTML = '🎯 進取 MODE';
+    btn.style.background = 'rgba(108,52,131,0.4)';
+    btn.style.borderColor = 'rgba(200,150,230,0.6)';
+    agInit();
+  } else {
+    btn.innerHTML = '🛡️ 保守 MODE';
+    btn.style.background = 'rgba(255,255,255,0.12)';
+    btn.style.borderColor = 'rgba(255,255,255,0.3)';
+  }
+}
+
+function agInit() {
+  agLoad();
+  agRestoreSettings();
+  agRenderAll();
+  // Set default date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('ag-t-buydate').value = today;
+  document.getElementById('ag-dp-date').value = today;
+  // Populate year selector
+  const yearSel = document.getElementById('ag-q-year');
+  const curYear = new Date().getFullYear();
+  yearSel.innerHTML = '';
+  for (let y = curYear + 1; y >= curYear - 4; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    if (y === curYear) o.selected = true;
+    yearSel.appendChild(o);
+  }
+  // Set current quarter
+  const curQ = 'Q' + Math.ceil((new Date().getMonth() + 1) / 3);
+  document.getElementById('ag-q-quarter').value = curQ;
+}
+
+function agRenderAll() {
+  agRenderDashboard();
+  agRenderOpenPositions();
+  agRenderClosedTrades();
+  agRenderDailyHistory();
+  agRenderRebalance();
+  agRenderQuarterlyHistory();
+}
+
+function agShowTab(name) {
+  document.querySelectorAll('.ag-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('#nav-aggressive button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).style.display = 'block';
+  event.target.classList.add('active');
+  if (name === 'ag-rebalance') agRenderRebalance();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function agToHKD(amt, code) { return toHKD(amt, code); }
+function agGetCurrency(code) { return getCurrency(code); }
+function agCalcFeeHKD(t, legs = 2) {
+  const cur = agGetCurrency(t.code);
+  const r = agState.usdRate || 7.78;
+  return cur === 'HKD'
+    ? (agState.fees?.hk || 55) * legs
+    : (agState.fees?.us || 2.05) * legs * r;
+}
+function agCalcRetPct(t) {
+  if (!t.sellprice || !t.buyprice) return null;
+  const dir = t.type === 'Short' ? -1 : 1;
+  return dir * (t.sellprice - t.buyprice) / t.buyprice * 100;
+}
+function agCalcPlAmt(t) {
+  if (!t.sellprice || !t.buyprice) return null;
+  const dir = t.type === 'Short' ? -1 : 1;
+  return dir * (t.sellprice - t.buyprice) * Math.abs(t.shares || 0);
+}
+function agCalcNetPlHKD(t) {
+  const pl = agCalcPlAmt(t);
+  return pl !== null ? agToHKD(pl, t.code) - agCalcFeeHKD(t, 2) : null;
+}
+function agCalcPnlPct(t, curr) {
+  if (!curr || !t.buyprice) return null;
+  const dir = t.type === 'Short' ? -1 : 1;
+  return dir * (curr - t.buyprice) / t.buyprice * 100;
+}
+function agCalcPnlAmt(t, curr) {
+  if (!curr || !t.buyprice) return null;
+  const dir = t.type === 'Short' ? -1 : 1;
+  return dir * (curr - t.buyprice) * Math.abs(t.shares || 0);
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function agRenderDashboard() {
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  const codes = [...new Set(open.map(t => t.code))];
+  const numPos = codes.length;
+  document.getElementById('ag-dash-theme').textContent = agState.currentTheme || '—';
+  const posEl = document.getElementById('ag-dash-positions');
+  posEl.textContent = numPos;
+  posEl.style.color = numPos > agState.maxPositions ? 'var(--red)' : 'var(--green)';
+  document.getElementById('ag-dash-pos-sub').textContent = `目標 ≤${agState.maxPositions || 6}`;
+  document.getElementById('ag-dash-cash-target').textContent = `目標 ${agState.cashPct || 10}%`;
+
+  // Compute total HKD value
+  let totalHKD = 0;
+  codes.forEach(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr = agState.currentPrices[code];
+    const px = curr || lots[0].buyprice;
+    const shares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
+    totalHKD += agToHKD(px * shares, code);
+  });
+
+  // Compute total P&L
+  let totalPnlHKD = 0; let hasPnl = false;
+  codes.forEach(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr = agState.currentPrices[code];
+    if (!curr) return;
+    lots.forEach(t => {
+      const pl = agCalcPnlAmt(t, curr);
+      if (pl !== null) { totalPnlHKD += agToHKD(pl, t.code); hasPnl = true; }
+    });
+  });
+  const pnlEl = document.getElementById('ag-dash-pnl');
+  if (hasPnl) {
+    pnlEl.textContent = (totalPnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(totalPnlHKD).toLocaleString();
+    pnlEl.style.color = totalPnlHKD >= 0 ? 'var(--green)' : 'var(--red)';
+  } else { pnlEl.textContent = '—'; pnlEl.style.color = ''; }
+
+  // Cash %
+  const latestDP = agState.dailyPerf?.slice(-1)[0];
+  if (latestDP && latestDP.total && totalHKD) {
+    const cashHKD = latestDP.total - totalHKD;
+    const cashPctActual = (cashHKD / latestDP.total * 100).toFixed(1);
+    const cashEl = document.getElementById('ag-dash-cash');
+    cashEl.textContent = cashPctActual + '%';
+    cashEl.style.color = parseFloat(cashPctActual) < (agState.cashPct || 10) * 0.7 ? 'var(--red)' : 'var(--green)';
+  } else { document.getElementById('ag-dash-cash').textContent = '—%'; }
+
+  // Overview table
+  const ovEl = document.getElementById('ag-positions-overview');
+  if (!codes.length) { ovEl.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div>'; return; }
+  const threshold = agState.rebalanceThreshold || 25;
+  const equalTarget = totalHKD > 0 ? (100 - (agState.cashPct || 10)) / numPos : 0;
+  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
+    <th>股票</th><th>主題</th><th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th style="text-align:center">比重%</th><th>目標%</th><th>偏差</th><th>操作</th></tr>`;
+  // Rebalance alerts
+  let alerts = '';
+  codes.forEach(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr = agState.currentPrices[code];
+    const px = curr || lots[0].buyprice;
+    const shares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
+    const posHKD = agToHKD(px * shares, code);
+    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100) : 0;
+    const dev = weight - equalTarget;
+    const pnlHKD = curr ? lots.reduce((s, t) => {
+      const pl = agCalcPnlAmt(t, curr);
+      return s + (pl !== null ? agToHKD(pl, t.code) : 0);
+    }, 0) : null;
+    const pnlPct = curr ? lots.reduce((s, t) => s + (agCalcPnlPct(t, curr) || 0), 0) / lots.length : null;
+    const wColor = weight > threshold ? 'var(--red)' : weight > equalTarget * 1.1 ? 'var(--amber)' : 'var(--green)';
+    const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
+    const theme = lots[0].theme || agState.currentTheme || '—';
+    if (weight > threshold) alerts += `<div class="ag-rebal-alert">⚠️ <strong>${code}</strong> 佔比 <strong>${weight.toFixed(1)}%</strong>，超過閾值 ${threshold}%。建議減持至約 ${equalTarget.toFixed(1)}%（即減少約 ${((weight - equalTarget) / 100 * posHKD / (curr || px)).toFixed(0)} 股）</div>`;
+    html += `<tr>
+      <td><strong>${code}</strong></td>
+      <td style="font-size:11px;color:var(--purple)">${theme}</td>
+      <td><input type="number" step="0.01" value="${curr || ''}" placeholder="輸入" style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px" onchange="agUpdatePrice('${code}',this.value)"></td>
+      <td style="color:${pColor};font-weight:700">${pnlPct !== null ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%' : '—'}</td>
+      <td style="color:${pColor};font-weight:700;text-align:right;font-size:12px">${pnlHKD !== null ? (pnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(pnlHKD).toLocaleString() : '—'}</td>
+      <td style="text-align:center;font-weight:700;color:${wColor}">${weight.toFixed(1)}%</td>
+      <td style="text-align:center;color:var(--gray-dark)">${equalTarget.toFixed(1)}%</td>
+      <td style="text-align:center;color:${dev > 3 ? 'var(--amber)' : 'inherit'}">${dev >= 0 ? '+' : ''}${dev.toFixed(1)}%</td>
+      <td style="white-space:nowrap">
+        ${lots.length === 1
+          ? `<button class="btn btn-ghost btn-sm" onclick="agEditTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
+             <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+             <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
+          : `<span style="font-size:11px;color:var(--gray-dark)">${lots.length}筆</span>`}
+      </td>
+    </tr>`;
+  });
+  html += '</table></div>';
+  ovEl.innerHTML = html;
+  document.getElementById('ag-rebalance-alerts').innerHTML = alerts;
+}
+
+function agUpdatePrice(code, val) {
+  if (val) agState.currentPrices[code] = parseFloat(val);
+  agSave();
+  agRenderDashboard();
+  agRenderRebalance();
+}
+
+// ── TRADES ────────────────────────────────────────────────────
+function agAddTrade() {
+  const code = document.getElementById('ag-t-code').value.trim().toUpperCase();
+  const theme = document.getElementById('ag-t-theme').value.trim() || agState.currentTheme || '';
+  const type = document.getElementById('ag-t-type').value;
+  const buydate = document.getElementById('ag-t-buydate').value;
+  const buyprice = parseFloat(document.getElementById('ag-t-buyprice').value);
+  const shares = parseFloat(document.getElementById('ag-t-shares').value);
+  if (!code || !buydate || !buyprice || !shares) { showToast('請填寫必填欄位（股票、日期、價格、股數）'); return; }
+  agState.trades.push({
+    id: agTradeIdCounter++, code, theme, type, buydate,
+    buyprice, shares, status: 'open',
+    stop: parseFloat(document.getElementById('ag-t-stop').value) || null,
+    target: parseFloat(document.getElementById('ag-t-target').value) || null,
+    note: document.getElementById('ag-t-note').value.trim(),
+    selldate: null, sellprice: null,
+  });
+  agSave(); agRenderAll();
+  ['ag-t-code','ag-t-buyprice','ag-t-shares','ag-t-stop','ag-t-target','ag-t-note'].forEach(id => document.getElementById(id).value = '');
+  showToast(`${code} 已加入記錄 ✅`);
+}
+
+function agCloseTrade(id) {
+  const t = agState.trades.find(t => t.id === id);
+  if (!t) return;
+  const sp = prompt(`平倉 ${t.code}（買入價：${t.buyprice}）\n請輸入賣出價格：`);
+  if (!sp) return;
+  const sd = prompt('賣出日期 (YYYY-MM-DD)：', new Date().toISOString().split('T')[0]);
+  if (!sd) return;
+  t.sellprice = parseFloat(sp); t.selldate = sd; t.status = 'closed';
+  agSave(); agRenderAll(); showToast(`${t.code} 已平倉 ✅`);
+}
+
+function agEditTrade(id) {
+  const t = agState.trades.find(t => t.id === id);
+  if (!t) return;
+  document.getElementById('ag-t-code').value = t.code;
+  document.getElementById('ag-t-theme').value = t.theme || '';
+  document.getElementById('ag-t-type').value = t.type || 'Long';
+  document.getElementById('ag-t-buydate').value = t.buydate || '';
+  document.getElementById('ag-t-buyprice').value = t.buyprice || '';
+  document.getElementById('ag-t-shares').value = t.shares || '';
+  document.getElementById('ag-t-stop').value = t.stop || '';
+  document.getElementById('ag-t-target').value = t.target || '';
+  document.getElementById('ag-t-note').value = t.note || '';
+  agState.trades = agState.trades.filter(x => x.id !== id);
+  agSave(); agRenderAll();
+  document.getElementById('ag-t-code').focus();
+  document.querySelector('#tab-ag-trades .card').scrollIntoView({ behavior:'smooth' });
+  showToast('記錄已載入，修改後按「加入記錄」儲存');
+}
+
+function agDeleteTrade(id) {
+  const t = agState.trades.find(x => x.id === id);
+  if (!t || !confirm(`確定刪除 ${t.code} 記錄？`)) return;
+  agState.trades = agState.trades.filter(x => x.id !== id);
+  agSave(); agRenderAll(); showToast('記錄已刪除');
+}
+
+function agRenderOpenPositions() {
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  const el = document.getElementById('ag-openPositions');
+  if (!open.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉</div>'; return; }
+  const codes = [...new Set(open.map(t => t.code))];
+  const totalHKD = codes.reduce((s, code) => {
+    const lots = open.filter(t => t.code === code);
+    const px = agState.currentPrices[code] || lots[0].buyprice;
+    return s + agToHKD(px * lots.reduce((a, t) => a + Math.abs(t.shares), 0), code);
+  }, 0);
+  let html = `<table class="tbl"><tr><th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th><th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th>比重%</th><th>操作</th></tr>`;
+  codes.forEach(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr = agState.currentPrices[code];
+    const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
+    const avgBuy = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares), 0) / totalShares;
+    const px = curr || avgBuy;
+    const posHKD = agToHKD(px * totalShares, code);
+    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100).toFixed(1) : '—';
+    const pnlHKD = curr ? lots.reduce((s, t) => s + (agToHKD(agCalcPnlAmt(t, curr) || 0, t.code)), 0) : null;
+    const pnlPct = curr ? (lots.reduce((s, t) => { const p = agCalcPnlPct(t, curr); return s + (p || 0); }, 0) / lots.length) : null;
+    const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
+    const wNum = parseFloat(weight);
+    const thresh = agState.rebalanceThreshold || 25;
+    const wColor = wNum > thresh ? 'var(--red)' : 'var(--blue-mid)';
+    html += `<tr style="background:var(--gray)">
+      <td style="white-space:nowrap"><strong>${code}</strong>${lots.length > 1 ? `<span style="font-size:10px;background:var(--purple);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px">${lots.length}筆</span>` : ''}</td>
+      <td style="font-size:11px;color:var(--purple)">${lots[0].theme || '—'}</td>
+      <td style="font-size:12px">${lots.every(t => t.type === lots[0].type) ? lots[0].type : '多'}</td>
+      <td style="font-size:12px">${lots[0].buydate}</td>
+      <td style="text-align:center">${lots[0].buydate ? Math.round((new Date() - new Date(lots[0].buydate)) / 86400000) : '—'}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
+      <td style="font-size:12px">${avgBuy.toFixed(avgBuy < 10 ? 4 : 2)}</td>
+      <td style="font-weight:700">${totalShares}</td>
+      <td style="background:#f0f4fa"><input type="number" step="0.01" value="${curr || ''}" placeholder="輸入" style="width:76px;padding:3px 5px;border:1px solid #aac;border-radius:4px;font-size:12px" onchange="agUpdatePrice('${code}',this.value)"></td>
+      <td style="color:${pColor};font-weight:700">${pnlPct !== null ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%' : '—'}</td>
+      <td style="color:${pColor};font-weight:700;text-align:right;font-size:12px">${pnlHKD !== null ? (pnlHKD >= 0 ? '+' : '') + 'HK$' + Math.round(pnlHKD).toLocaleString() : '—'}</td>
+      <td style="text-align:center;font-weight:700;color:${wColor}">${weight}%${wNum > thresh ? ' ⚠️' : ''}</td>
+      <td style="white-space:nowrap">
+        ${lots.length === 1
+          ? `<button class="btn btn-ghost btn-sm" onclick="agEditTrade(${lots[0].id})" title="編輯" style="padding:2px 5px">✏️</button>
+             <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${lots[0].id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
+             <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${lots[0].id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`
+          : `<span style="font-size:11px;color:var(--gray-dark)">多筆</span>`}
+      </td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function agRenderClosedTrades() {
+  const closed = agState.trades.filter(t => t.status === 'closed').slice().reverse();
+  const el = document.getElementById('ag-closedTrades');
+  if (!closed.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div>'; return; }
+  let html = `<table class="tbl"><tr><th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>賣出日</th><th>持倉天</th><th>買入價</th><th>賣出價</th><th>回報%</th><th>P&L(HK$)</th><th>勝負</th><th>操作</th></tr>`;
+  closed.forEach(t => {
+    const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
+    const retPct = agCalcRetPct(t);
+    const netHKD = agCalcNetPlHKD(t);
+    const isWin = netHKD !== null ? netHKD > 0 : retPct !== null ? retPct > 0 : false;
+    html += `<tr>
+      <td><strong>${t.code}</strong></td>
+      <td style="font-size:11px;color:var(--purple)">${t.theme || '—'}</td>
+      <td>${t.type || '—'}</td>
+      <td>${t.buydate}</td><td>${t.selldate || '—'}</td>
+      <td style="text-align:center">${days}</td>
+      <td>${t.buyprice}</td><td>${t.sellprice || '—'}</td>
+      <td class="${isWin ? 'win' : 'loss'}">${retPct !== null ? retPct.toFixed(1) + '%' : '—'}</td>
+      <td class="${isWin ? 'win' : 'loss'}" style="font-weight:700;text-align:right;font-size:12px">${netHKD !== null ? (netHKD >= 0 ? '+' : '') + Math.round(netHKD).toLocaleString() : '—'}</td>
+      <td class="${isWin ? 'win' : 'loss'}">${isWin ? '✅' : '❌'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="agEditTrade(${t.id})" title="編輯" style="padding:2px 5px">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${t.id})" title="刪除" style="padding:2px 5px;margin-left:2px;color:var(--red)">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function agExportOpenCSV() {
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  if (!open.length) { showToast('暫無持倉'); return; }
+  const h = ['股票','主題','類型','買入日','買入價','股數','止蝕','目標','備注'];
+  const rows = open.map(t => [t.code, t.theme||'', t.type, t.buydate, t.buyprice, t.shares, t.stop||'', t.target||'', (t.note||'').replace(/,/g,' ')]);
+  const blob = new Blob(['﻿' + [h,...rows].map(r=>r.join(',')).join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `進取_持倉_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  showToast(`已匯出 ${open.length} 筆持倉 ✅`);
+}
+
+function agExportClosedCSV() {
+  const closed = agState.trades.filter(t => t.status === 'closed');
+  if (!closed.length) { showToast('暫無已平倉記錄'); return; }
+  const h = ['股票','主題','類型','買入日','賣出日','持倉天','買入價','賣出價','回報%','P&L(HKD)','手續費(HKD)'];
+  const rows = closed.map(t => {
+    const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate)-new Date(t.buydate))/86400000) : '';
+    const retPct = agCalcRetPct(t);
+    const net = agCalcNetPlHKD(t);
+    return [t.code, t.theme||'', t.type, t.buydate||'', t.selldate||'', days, t.buyprice, t.sellprice||'', retPct!==null?retPct.toFixed(1):'', net!==null?Math.round(net):'', Math.round(agCalcFeeHKD(t,2))];
+  });
+  const blob = new Blob(['﻿' + [h,...rows].map(r=>r.join(',')).join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `進取_已平倉_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  showToast(`已匯出 ${closed.length} 筆已平倉記錄 ✅`);
+}
+
+// ── DAILY PERFORMANCE ─────────────────────────────────────────
+function agSaveDailyPerf() {
+  const date = document.getElementById('ag-dp-date').value;
+  const total = parseFloat(document.getElementById('ag-dp-total').value);
+  const note = document.getElementById('ag-dp-note').value.trim();
+  if (!date || !total) { showToast('請填寫日期和組合總值'); return; }
+  if (!agState.dailyPerf) agState.dailyPerf = [];
+  const existing = agState.dailyPerf.findIndex(r => r.date === date);
+  const entry = { date, total, note };
+  if (existing >= 0) agState.dailyPerf[existing] = entry;
+  else agState.dailyPerf.push(entry);
+  agState.dailyPerf.sort((a, b) => a.date.localeCompare(b.date));
+  agSave(); agRenderDailyHistory();
+  document.getElementById('ag-dp-note').value = '';
+  showToast(`${date} 記錄已儲存 ✅`);
+}
+
+function agRenderDailyHistory() {
+  const el = document.getElementById('ag-dp-history');
+  const dp = (agState.dailyPerf || []).slice().reverse();
+  if (!dp.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div>'; return; }
+  let html = `<table class="tbl"><tr><th>日期</th><th>組合總值 (HK$)</th><th>日變動</th><th>備注</th><th>操作</th></tr>`;
+  const all = agState.dailyPerf.slice().sort((a,b) => a.date.localeCompare(b.date));
+  dp.forEach(r => {
+    const idx = all.findIndex(x => x.date === r.date);
+    const prev = idx > 0 ? all[idx - 1] : null;
+    const dayChg = prev ? ((r.total - prev.total) / prev.total * 100) : null;
+    const chgColor = dayChg !== null ? (dayChg >= 0 ? 'var(--green)' : 'var(--red)') : '';
+    html += `<tr>
+      <td>${r.date}</td>
+      <td style="font-weight:700">HK$${Math.round(r.total).toLocaleString()}</td>
+      <td style="color:${chgColor};font-weight:700">${dayChg !== null ? (dayChg >= 0 ? '+' : '') + dayChg.toFixed(2) + '%' : '—'}</td>
+      <td style="font-size:12px;color:var(--gray-dark)">${r.note || '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="agDeleteDailyEntry('${r.date}')" style="color:var(--red);padding:2px 5px">🗑️</button></td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function agDeleteDailyEntry(date) {
+  if (!confirm(`確定刪除 ${date} 的記錄？`)) return;
+  agState.dailyPerf = agState.dailyPerf.filter(r => r.date !== date);
+  agSave(); agRenderDailyHistory(); showToast(`${date} 記錄已刪除`);
+}
+
+// ── REBALANCE ─────────────────────────────────────────────────
+function agRenderRebalance() {
+  const el = document.getElementById('ag-rebalance-table');
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  const codes = [...new Set(open.map(t => t.code))];
+  if (!codes.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div>'; return; }
+  const totalHKD = codes.reduce((s, code) => {
+    const lots = open.filter(t => t.code === code);
+    const px = agState.currentPrices[code] || lots[0].buyprice;
+    return s + agToHKD(px * lots.reduce((a, t) => a + Math.abs(t.shares), 0), code);
+  }, 0);
+  const numPos = codes.length;
+  const cashPct = agState.cashPct || 10;
+  const equalTarget = (100 - cashPct) / numPos;
+  const threshold = agState.rebalanceThreshold || 25;
+  // Sort by weight desc
+  const weighted = codes.map(code => {
+    const lots = open.filter(t => t.code === code);
+    const px = agState.currentPrices[code] || lots[0].buyprice;
+    const shares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
+    const posHKD = agToHKD(px * shares, code);
+    return { code, weight: totalHKD > 0 ? posHKD / totalHKD * 100 : 0, posHKD, lots, theme: lots[0].theme || '—' };
+  }).sort((a, b) => b.weight - a.weight);
+
+  let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px">
+    <span>📌 目標平均比重：<strong>${equalTarget.toFixed(1)}%</strong></span>
+    <span>💰 現金目標：<strong>${cashPct}%</strong></span>
+    <span>⚠️ 再平衡閾值：<strong>${threshold}%</strong></span>
+  </div>`;
+  html += `<div style="overflow-x:auto"><table class="tbl"><tr><th>股票</th><th>主題</th><th>比重%</th><th>目標%</th><th>偏差</th><th>狀態</th><th>建議行動</th></tr>`;
+  weighted.forEach(({ code, weight, posHKD, lots, theme }) => {
+    const dev = weight - equalTarget;
+    const curr = agState.currentPrices[code];
+    const px = curr || lots[0].buyprice;
+    let status = '✅ 正常'; let statusColor = 'var(--green)';
+    let suggestion = '—';
+    if (weight > threshold) {
+      status = '🔴 超重'; statusColor = 'var(--red)';
+      const excessHKD = (weight - equalTarget) / 100 * (totalHKD || 1);
+      const sharesToTrim = curr ? Math.floor(excessHKD / agToHKD(curr, code)) : '—';
+      suggestion = `建議減持約 ${sharesToTrim} 股，降至 ${equalTarget.toFixed(1)}%`;
+    } else if (dev > equalTarget * 0.15) {
+      status = '🟡 偏重'; statusColor = 'var(--amber)'; suggestion = '可考慮小幅減持';
+    } else if (dev < -equalTarget * 0.15) {
+      status = '🔵 偏輕'; statusColor = 'var(--blue-mid)'; suggestion = '可考慮加倉補至目標';
+    }
+    html += `<tr>
+      <td><strong>${code}</strong></td>
+      <td style="font-size:11px;color:var(--purple)">${theme}</td>
+      <td style="font-weight:700;color:${weight > threshold ? 'var(--red)' : weight > equalTarget * 1.1 ? 'var(--amber)' : 'var(--green)'}">${weight.toFixed(1)}%</td>
+      <td style="color:var(--gray-dark)">${equalTarget.toFixed(1)}%</td>
+      <td style="color:${Math.abs(dev) > 3 ? 'var(--amber)' : 'inherit'}">${dev >= 0 ? '+' : ''}${dev.toFixed(1)}%</td>
+      <td style="color:${statusColor};font-weight:700">${status}</td>
+      <td style="font-size:12px;color:var(--gray-dark)">${suggestion}</td>
+    </tr>`;
+  });
+  html += '</table></div>';
+  el.innerHTML = html;
+}
+
+// ── QUARTERLY REVIEW ──────────────────────────────────────────
+function agGetQuarterKey() {
+  return `${document.getElementById('ag-q-year').value}-${document.getElementById('ag-q-quarter').value}`;
+}
+function agLoadQuarterly() {
+  const key = agGetQuarterKey();
+  const r = (agState.quarterlyReviews || {})[key];
+  if (!r) { showToast('此季度尚無記錄'); agClearQuarterlyForm(); return; }
+  document.getElementById('ag-q-theme-eval').value = r.themeEval || '';
+  const changeTheme = document.getElementById('ag-q-change-theme');
+  changeTheme.checked = !!r.changeTheme;
+  document.getElementById('ag-q-new-theme-row').style.display = r.changeTheme ? 'block' : 'none';
+  document.getElementById('ag-q-new-theme').value = r.newTheme || '';
+  document.getElementById('ag-q-strategy').value = r.strategy || '';
+  agShowQuarterStats(key);
+}
+function agClearQuarterlyForm() {
+  ['ag-q-theme-eval','ag-q-new-theme','ag-q-strategy'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ag-q-change-theme').checked = false;
+  document.getElementById('ag-q-new-theme-row').style.display = 'none';
+  document.getElementById('ag-q-stats').style.display = 'none';
+  agShowQuarterStats(agGetQuarterKey());
+}
+function agShowQuarterStats(key) {
+  const [year, q] = key.split('-');
+  const qNum = parseInt(q.replace('Q',''));
+  const qStart = new Date(year, (qNum-1)*3, 1);
+  const qEnd = new Date(year, qNum*3, 1);
+  const closed = agState.trades.filter(t => {
+    if (t.status !== 'closed' || !t.selldate) return false;
+    const sd = new Date(t.selldate);
+    return sd >= qStart && sd < qEnd;
+  });
+  const el = document.getElementById('ag-q-stats');
+  if (!closed.length) { el.style.display = 'none'; return; }
+  const wins = closed.filter(t => (agCalcRetPct(t) || 0) > 0);
+  const totalNet = closed.reduce((s, t) => s + (agCalcNetPlHKD(t) || 0), 0);
+  el.innerHTML = `<strong>${key} 季度統計（${closed.length} 筆已平倉）</strong><br>
+    勝率：${closed.length ? (wins.length / closed.length * 100).toFixed(0) : 0}%
+    P&L (淨)：<strong style="color:${totalNet >= 0 ? 'var(--green)' : 'var(--red)'}">${totalNet >= 0 ? '+' : ''}HK$${Math.round(totalNet).toLocaleString()}</strong>
+    贏：${wins.length} / 輸：${closed.length - wins.length}`;
+  el.style.display = 'block';
+}
+function agSaveQuarterly() {
+  const key = agGetQuarterKey();
+  if (!agState.quarterlyReviews) agState.quarterlyReviews = {};
+  const changeTheme = document.getElementById('ag-q-change-theme').checked;
+  agState.quarterlyReviews[key] = {
+    themeEval: document.getElementById('ag-q-theme-eval').value.trim(),
+    changeTheme,
+    newTheme: changeTheme ? document.getElementById('ag-q-new-theme').value.trim() : '',
+    strategy: document.getElementById('ag-q-strategy').value.trim(),
+    savedAt: new Date().toISOString(),
+  };
+  if (changeTheme && agState.quarterlyReviews[key].newTheme) {
+    agState.currentTheme = agState.quarterlyReviews[key].newTheme;
+    showToast(`主題已更新為「${agState.currentTheme}」`);
+  }
+  agSave(); agRenderQuarterlyHistory();
+  showToast(`${key} 季度回顧已儲存 ✅`);
+}
+function agRenderQuarterlyHistory() {
+  const el = document.getElementById('ag-quarterly-history');
+  const reviews = agState.quarterlyReviews || {};
+  const keys = Object.keys(reviews).sort().reverse();
+  if (!keys.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無記錄</div>'; return; }
+  let html = '';
+  keys.forEach(key => {
+    const r = reviews[key];
+    html += `<div style="border:1px solid var(--gray-mid);border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong style="color:var(--purple)">${key}</strong>
+        ${r.changeTheme && r.newTheme ? `<span style="background:var(--purple);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px">換主題→${r.newTheme}</span>` : ''}
+      </div>
+      ${r.themeEval ? `<div style="font-size:12px;color:var(--gray-dark);margin-bottom:4px"><strong>主題評估：</strong>${r.themeEval}</div>` : ''}
+      ${r.strategy ? `<div style="font-size:12px;color:var(--gray-dark)"><strong>下季策略：</strong>${r.strategy}</div>` : ''}
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+function agRestoreSettings() {
+  document.getElementById('ag-set-theme').value = agState.currentTheme || 'AI';
+  document.getElementById('ag-set-maxpos').value = agState.maxPositions || 6;
+  document.getElementById('ag-set-cash').value = agState.cashPct || 10;
+  document.getElementById('ag-set-rebal').value = agState.rebalanceThreshold || 25;
+  document.getElementById('ag-set-fee-us').value = agState.fees?.us || 2.05;
+  document.getElementById('ag-set-fee-hk').value = agState.fees?.hk || 55;
+  document.getElementById('ag-set-usd').value = agState.usdRate || 7.78;
+  document.getElementById('ag-set-jpy').value = agState.jpyRate || 0.051;
+  document.getElementById('ag-set-krw').value = agState.krwRate || 0.0057;
+}
+function agSaveSettings() {
+  agState.currentTheme = document.getElementById('ag-set-theme').value.trim() || 'AI';
+  agState.maxPositions = parseInt(document.getElementById('ag-set-maxpos').value) || 6;
+  agState.cashPct = parseFloat(document.getElementById('ag-set-cash').value) || 10;
+  agState.rebalanceThreshold = parseFloat(document.getElementById('ag-set-rebal').value) || 25;
+  agState.fees = { us: parseFloat(document.getElementById('ag-set-fee-us').value) || 2.05, hk: parseFloat(document.getElementById('ag-set-fee-hk').value) || 55 };
+  agState.usdRate = parseFloat(document.getElementById('ag-set-usd').value) || 7.78;
+  agState.jpyRate = parseFloat(document.getElementById('ag-set-jpy').value) || 0.051;
+  agState.krwRate = parseFloat(document.getElementById('ag-set-krw').value) || 0.0057;
+  agSave(); agRenderDashboard(); agRenderRebalance();
+}
+
+// ── CLOUD SYNC ────────────────────────────────────────────────
+async function agPushToCloud(silent = false) {
+  const { token, id } = getGistCreds();
+  if (!token || !id) { if (!silent) document.getElementById('ag-syncStatus').textContent = '請先在保守MODE設定中填入 Token 及 Gist ID'; return; }
+  if (!silent) document.getElementById('ag-syncStatus').textContent = '⏳ 推送中...';
+  try {
+    const r = await fetch(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH', headers: gistHeaders(token),
+      body: JSON.stringify({ files: { 'wilson_tracker_ag.json': { content: JSON.stringify(agState) } } }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
+    if (!silent) document.getElementById('ag-syncStatus').textContent = `✅ 已推送 (${new Date().toLocaleString('zh-HK')})`;
+    setFloatSync('☁️✅', 'var(--green)');
+  } catch(e) {
+    if (!silent) document.getElementById('ag-syncStatus').textContent = '❌ 推送失敗：' + e.message;
+    setFloatSync('☁️❌', 'var(--red)');
+  }
+}
+async function agPullFromCloud() {
+  const { token, id } = getGistCreds();
+  if (!token || !id) { document.getElementById('ag-syncStatus').textContent = '請先在保守MODE設定中填入 Token 及 Gist ID'; return; }
+  document.getElementById('ag-syncStatus').textContent = '⏳ 載入中...';
+  try {
+    const r = await fetch(`https://api.github.com/gists/${id}`, { headers: gistHeaders(token) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const content = data.files?.['wilson_tracker_ag.json']?.content;
+    if (!content) { document.getElementById('ag-syncStatus').textContent = '雲端無進取MODE數據'; return; }
+    if (!confirm('確定從雲端載入進取MODE數據？本地數據將被覆蓋。')) return;
+    agState = JSON.parse(content);
+    localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
+    agInit(); agRenderAll();
+    document.getElementById('ag-syncStatus').textContent = `✅ 已從雲端載入 (${new Date().toLocaleString('zh-HK')})`;
+    showToast('進取MODE數據已從雲端載入 ✅');
+  } catch(e) {
+    document.getElementById('ag-syncStatus').textContent = '❌ 載入失敗：' + e.message;
+  }
+}
+function agExportJSON() {
+  const blob = new Blob([JSON.stringify(agState, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `進取MODE_${new Date().toISOString().slice(0,10)}.json`; a.click();
+  showToast('數據已匯出 ✅');
+}
+function agImportJSON(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      if (!confirm('確定匯入？本地進取MODE數據將被覆蓋。')) return;
+      agState = JSON.parse(e.target.result);
+      localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
+      agInit(); agRenderAll(); showToast('數據已匯入 ✅');
+    } catch(err) { showToast('匯入失敗：JSON 格式錯誤'); }
+  };
+  reader.readAsText(file);
+}
+function agClearAll() {
+  agState = { trades:[], currentPrices:{}, currentTheme:'AI', maxPositions:6, cashPct:10, rebalanceThreshold:25, usdRate:7.78, jpyRate:0.051, krwRate:0.0057, fees:{us:2.05,hk:55}, dailyPerf:[], quarterlyReviews:{} };
+  localStorage.removeItem('wilson_tracker_ag');
+  agInit(); agRenderAll(); showToast('進取MODE數據已清除');
+}
+
+
 </script>
 
 <!-- ===================== MONTHLY PERFORMANCE TAB ===================== -->

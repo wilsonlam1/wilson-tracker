@@ -1007,6 +1007,14 @@
         <div class="value" id="ag-dash-pnl" style="font-size:16px">—</div>
         <div class="sub" id="ag-dash-pnl-pct">總持倉</div>
       </div>
+      <div class="stat-box" style="background:var(--gray)">
+        <div class="label" style="margin-bottom:6px">快速更新現價</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="agFetchAllPrices()" id="ag-fetchBtn">⬇️ 自動抓取</button>
+          <span id="ag-fetchStatus" style="font-size:11px;color:var(--gray-dark)"></span>
+        </div>
+        <div style="font-size:11px;color:var(--gray-dark);margin-top:4px">使用保守MODE同一 Finnhub Key</div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">📊 持倉比重一覽</div>
@@ -1043,9 +1051,13 @@
     </div>
 
     <div class="card">
-      <div class="card-title" style="justify-content:space-between">
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span>📋 持倉中</span>
-        <button class="btn btn-ghost btn-sm" onclick="agExportOpenCSV()" style="font-size:12px">📥 匯出CSV</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="agFetchAllPrices()" id="ag-fetchBtn2" style="font-size:12px">⬇️ 自動抓取報價</button>
+          <span id="ag-fetchStatus2" style="font-size:11px;color:var(--gray-dark)"></span>
+          <button class="btn btn-ghost btn-sm" onclick="agExportOpenCSV()" style="font-size:12px">📥 CSV</button>
+        </div>
       </div>
       <div id="ag-openPositions"><div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無持倉</div></div>
     </div>
@@ -3865,6 +3877,57 @@ function agUpdatePrice(code, val) {
   agSave();
   agRenderDashboard();
   agRenderRebalance();
+}
+
+function agSetFetchUI(loading, msg, color) {
+  ['ag-fetchBtn','ag-fetchBtn2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = loading;
+    el.textContent = loading ? '⏳ 抓取中...' : '⬇️ 自動抓取報價';
+  });
+  ['ag-fetchStatus','ag-fetchStatus2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.color = color || 'var(--gray-dark)'; }
+  });
+}
+
+async function agFetchAllPrices() {
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  if (!open.length) { showToast('暫無持倉'); return; }
+  const codes = [...new Set(open.map(t => t.code))];
+  const finnhubKey = localStorage.getItem('finnhub_key') || '';
+  if (!finnhubKey) {
+    agSetFetchUI(false, '❌ 請先在保守MODE設定中輸入 Finnhub API Key', 'var(--red)');
+    return;
+  }
+  agSetFetchUI(true, '', '');
+  if (!agState.currentPrices) agState.currentPrices = {};
+  let ok = 0, fail = 0, failCodes = [];
+  for (const code of codes) {
+    const symbol = code.toUpperCase();
+    try {
+      const r = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubKey}`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const d = await r.json();
+      if (d.c && d.c > 0) { agState.currentPrices[code] = d.c; ok++; }
+      else { fail++; failCodes.push(code); }
+    } catch { fail++; failCodes.push(code); }
+  }
+  agSave();
+  agSetFetchUI(false,
+    ok > 0
+      ? `✅ ${ok}隻成功${fail > 0 ? ` · ${failCodes.join(',')} 失敗` : ''}`
+      : '❌ 抓取失敗，請手動輸入現價',
+    ok > 0 && fail === 0 ? 'var(--green)' : fail > 0 && ok > 0 ? 'var(--amber)' : 'var(--red)'
+  );
+  if (ok > 0) {
+    agRenderDashboard();
+    agRenderOpenPositions();
+    agRenderRebalance();
+  }
 }
 
 // ── TRADES ────────────────────────────────────────────────────

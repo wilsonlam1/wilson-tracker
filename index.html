@@ -1017,6 +1017,21 @@
       </div>
     </div>
     <div class="card">
+      <div class="card-title">💵 現金管理</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1;min-width:140px">
+          <label style="font-size:11px;font-weight:700" id="ag-label-A">戶口A 現金 (HK$)</label>
+          <input type="number" id="ag-cashA" placeholder="0" step="100" oninput="agSaveCash()" style="margin-top:3px">
+        </div>
+        <div style="flex:1;min-width:140px">
+          <label style="font-size:11px;font-weight:700" id="ag-label-B">戶口B 現金 (HK$)</label>
+          <input type="number" id="ag-cashB" placeholder="0" step="100" oninput="agSaveCash()" style="margin-top:3px">
+        </div>
+      </div>
+      <div id="ag-cash-summary" style="font-size:13px;color:var(--gray-dark)"></div>
+    </div>
+
+    <div class="card">
       <div class="card-title">📊 持倉比重一覽</div>
       <div id="ag-positions-overview"><div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div></div>
     </div>
@@ -1034,6 +1049,14 @@
             <option value="Long">Long 買入</option>
             <option value="Short">Short 沽空</option>
             <option value="Add">加倉</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>投資戶口</label>
+          <select id="ag-t-account">
+            <option value="A">戶口A</option>
+            <option value="B">戶口B</option>
           </select>
         </div>
       </div>
@@ -1173,6 +1196,16 @@
         <div class="form-group">
           <label>現金目標 %</label>
           <input type="number" id="ag-set-cash" value="10" min="0" max="50" step="1" oninput="agSaveSettings()">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>戶口A 名稱</label>
+          <input id="ag-set-labelA" placeholder="例：富途、IB" oninput="agSaveSettings()">
+        </div>
+        <div class="form-group">
+          <label>戶口B 名稱</label>
+          <input id="ag-set-labelB" placeholder="例：長橋、盈透" oninput="agSaveSettings()">
         </div>
       </div>
       <div class="form-row-3">
@@ -3656,6 +3689,8 @@ let agState = {
   usdRate: 7.78, jpyRate: 0.051, krwRate: 0.0057,
   fees: { us: 2.05, hk: 55 },
   dailyPerf: [], quarterlyReviews: {},
+  cashA: 0, cashB: 0,
+  accountLabelA: '戶口A', accountLabelB: '戶口B',
 };
 let agTradeIdCounter = 1;
 
@@ -3778,6 +3813,8 @@ function agRenderDashboard() {
   const open = agState.trades.filter(t => t.status !== 'closed');
   const codes = [...new Set(open.map(t => t.code))];
   const numPos = codes.length;
+  const labelA = agState.accountLabelA || '戶口A';
+  const labelB = agState.accountLabelB || '戶口B';
   document.getElementById('ag-dash-theme').textContent = agState.currentTheme || '—';
   const posEl = document.getElementById('ag-dash-positions');
   posEl.textContent = numPos;
@@ -3785,7 +3822,19 @@ function agRenderDashboard() {
   document.getElementById('ag-dash-pos-sub').textContent = `目標 ≤${agState.maxPositions || 6}`;
   document.getElementById('ag-dash-cash-target').textContent = `目標 ${agState.cashPct || 10}%`;
 
-  // Compute total HKD value
+  // Update cash input labels
+  const lA = document.getElementById('ag-label-A');
+  const lB = document.getElementById('ag-label-B');
+  if (lA) lA.textContent = `${labelA} 現金 (HK$)`;
+  if (lB) lB.textContent = `${labelB} 現金 (HK$)`;
+
+  // Restore cash inputs if not already set by user
+  const cashAInput = document.getElementById('ag-cashA');
+  const cashBInput = document.getElementById('ag-cashB');
+  if (cashAInput && cashAInput.value === '') cashAInput.value = agState.cashA || '';
+  if (cashBInput && cashBInput.value === '') cashBInput.value = agState.cashB || '';
+
+  // Compute positions HKD value
   let totalHKD = 0;
   codes.forEach(code => {
     const lots = open.filter(t => t.code === code);
@@ -3812,15 +3861,52 @@ function agRenderDashboard() {
     pnlEl.style.color = totalPnlHKD >= 0 ? 'var(--green)' : 'var(--red)';
   } else { pnlEl.textContent = '—'; pnlEl.style.color = ''; }
 
-  // Cash %
-  const latestDP = agState.dailyPerf?.slice(-1)[0];
-  if (latestDP && latestDP.total && totalHKD) {
-    const cashHKD = latestDP.total - totalHKD;
-    const cashPctActual = (cashHKD / latestDP.total * 100).toFixed(1);
-    const cashEl = document.getElementById('ag-dash-cash');
+  // Cash % — using explicit cashA + cashB
+  const cashA = agState.cashA || 0;
+  const cashB = agState.cashB || 0;
+  const totalCashHKD = cashA + cashB;
+  const grandTotal = totalHKD + totalCashHKD;
+  const cashEl = document.getElementById('ag-dash-cash');
+  if (grandTotal > 0) {
+    const cashPctActual = (totalCashHKD / grandTotal * 100).toFixed(1);
     cashEl.textContent = cashPctActual + '%';
-    cashEl.style.color = parseFloat(cashPctActual) < (agState.cashPct || 10) * 0.7 ? 'var(--red)' : 'var(--green)';
-  } else { document.getElementById('ag-dash-cash').textContent = '—%'; }
+    cashEl.style.color = parseFloat(cashPctActual) < (agState.cashPct || 10) * 0.5 ? 'var(--red)' : 'var(--green)';
+  } else { cashEl.textContent = '—%'; cashEl.style.color = ''; }
+
+  // Cash summary card
+  const sumEl = document.getElementById('ag-cash-summary');
+  if (sumEl) {
+    const aByAccount = { A: 0, B: 0 };
+    codes.forEach(code => {
+      const lots = open.filter(t => t.code === code);
+      const px = agState.currentPrices[code] || lots[0].buyprice;
+      lots.forEach(t => {
+        const acc = t.account || 'A';
+        aByAccount[acc] = (aByAccount[acc] || 0) + agToHKD(px * Math.abs(t.shares || 0), t.code);
+      });
+    });
+    sumEl.innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
+        <div style="flex:1;min-width:130px;background:var(--blue-light);border-radius:6px;padding:8px 10px">
+          <div style="font-weight:700;color:var(--blue)">${labelA}</div>
+          <div>股票：HK$${Math.round(aByAccount.A || 0).toLocaleString()}</div>
+          <div>現金：HK$${Math.round(cashA).toLocaleString()}</div>
+          <div style="font-weight:700;margin-top:3px">合計：HK$${Math.round((aByAccount.A || 0) + cashA).toLocaleString()}</div>
+        </div>
+        <div style="flex:1;min-width:130px;background:var(--purple-light);border-radius:6px;padding:8px 10px">
+          <div style="font-weight:700;color:var(--purple)">${labelB}</div>
+          <div>股票：HK$${Math.round(aByAccount.B || 0).toLocaleString()}</div>
+          <div>現金：HK$${Math.round(cashB).toLocaleString()}</div>
+          <div style="font-weight:700;margin-top:3px">合計：HK$${Math.round((aByAccount.B || 0) + cashB).toLocaleString()}</div>
+        </div>
+        <div style="flex:1;min-width:130px;background:var(--green-light);border-radius:6px;padding:8px 10px">
+          <div style="font-weight:700;color:var(--green)">總計</div>
+          <div>股票：HK$${Math.round(totalHKD).toLocaleString()}</div>
+          <div>現金：HK$${Math.round(totalCashHKD).toLocaleString()}</div>
+          <div style="font-weight:700;margin-top:3px">組合：HK$${Math.round(grandTotal).toLocaleString()}</div>
+        </div>
+      </div>`;
+  }
 
   // Overview table
   const ovEl = document.getElementById('ag-positions-overview');
@@ -3870,6 +3956,14 @@ function agRenderDashboard() {
   html += '</table></div>';
   ovEl.innerHTML = html;
   document.getElementById('ag-rebalance-alerts').innerHTML = alerts;
+}
+
+function agSaveCash() {
+  agState.cashA = parseFloat(document.getElementById('ag-cashA').value) || 0;
+  agState.cashB = parseFloat(document.getElementById('ag-cashB').value) || 0;
+  agSave();
+  agRenderDashboard();
+  agRenderRebalance();
 }
 
 function agUpdatePrice(code, val) {
@@ -3939,8 +4033,9 @@ function agAddTrade() {
   const buyprice = parseFloat(document.getElementById('ag-t-buyprice').value);
   const shares = parseFloat(document.getElementById('ag-t-shares').value);
   if (!code || !buydate || !buyprice || !shares) { showToast('請填寫必填欄位（股票、日期、價格、股數）'); return; }
+  const account = document.getElementById('ag-t-account').value || 'A';
   agState.trades.push({
-    id: agTradeIdCounter++, code, theme, type, buydate,
+    id: agTradeIdCounter++, code, theme, type, buydate, account,
     buyprice, shares, status: 'open',
     stop: parseFloat(document.getElementById('ag-t-stop').value) || null,
     target: parseFloat(document.getElementById('ag-t-target').value) || null,
@@ -3969,6 +4064,7 @@ function agEditTrade(id) {
   document.getElementById('ag-t-code').value = t.code;
   document.getElementById('ag-t-theme').value = t.theme || '';
   document.getElementById('ag-t-type').value = t.type || 'Long';
+  document.getElementById('ag-t-account').value = t.account || 'A';
   document.getElementById('ag-t-buydate').value = t.buydate || '';
   document.getElementById('ag-t-buyprice').value = t.buyprice || '';
   document.getElementById('ag-t-shares').value = t.shares || '';
@@ -4034,8 +4130,13 @@ function agRenderOpenPositions() {
     <button class="btn btn-ghost btn-sm" onclick="agCloseTrade(${id})" title="平倉" style="margin-left:2px;padding:2px 5px">📤</button>
     <button class="btn btn-ghost btn-sm" onclick="agDeleteTrade(${id})" title="刪除" style="margin-left:2px;padding:2px 5px">🗑️</button>`;
 
+  const lA = agState.accountLabelA || '戶口A';
+  const lB = agState.accountLabelB || '戶口B';
+  // Update account select options labels
+  const accSel = document.getElementById('ag-t-account');
+  if (accSel) { accSel.options[0].text = lA; accSel.options[1].text = lB; }
   let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
-    <th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th>
+    <th>股票</th><th>戶口</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th>
     <th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th>比重%</th><th>操作</th></tr>`;
 
   codes.forEach(code => {
@@ -4057,12 +4158,17 @@ function agRenderOpenPositions() {
     const daysSince = firstDate !== '—' ? Math.round((new Date() - new Date(firstDate)) / 86400000) : '—';
 
     // ── SUMMARY ROW ──
+    const accLabel = lots.every(t => (t.account||'A') === (lots[0].account||'A'))
+      ? (lots[0].account === 'B' ? lB : lA)
+      : `${lA}+${lB}`;
+    const accColor = lots[0].account === 'B' ? 'var(--purple)' : 'var(--blue-mid)';
     html += `<tr style="background:var(--gray);border-left:3px solid var(--purple)">
       <td style="white-space:nowrap">${hasMultiple
         ? `<span onclick="agToggleGroup('${code}')" style="cursor:pointer;color:var(--purple);font-weight:700;user-select:none;margin-right:2px">${isExpanded ? '▾' : '›'}</span>`
         : '<span style="display:inline-block;width:12px"></span>'
       }<strong>${code}</strong>${hasMultiple ? `<span style="font-size:10px;background:var(--purple);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;vertical-align:middle">${lots.length}筆</span>` : ''}
       </td>
+      <td style="font-size:11px;font-weight:700;color:${accColor}">${accLabel}</td>
       <td style="font-size:11px;color:var(--purple)">${lots[0].theme || '—'}</td>
       <td style="font-size:12px">${lots.every(t => t.type === lots[0].type) ? lots[0].type : '多類型'}</td>
       <td style="font-size:12px">${firstDate}${hasMultiple ? '<br><span style="font-size:10px;color:var(--purple)">首筆</span>' : ''}</td>
@@ -4092,9 +4198,11 @@ function agRenderOpenPositions() {
         const lotPosHKD = agToHKD(lotPx * Math.abs(t.shares), t.code);
         const lotWeight = totalHKD > 0 ? (lotPosHKD / totalHKD * 100).toFixed(1) : '—';
         const tDays = t.buydate ? Math.round((new Date() - new Date(t.buydate)) / 86400000) : '—';
+        const tAccLabel = t.account === 'B' ? lB : lA;
+        const tAccColor = t.account === 'B' ? 'var(--purple)' : 'var(--blue-mid)';
         html += `<tr style="background:#f5f0ff;border-left:3px solid var(--purple)">
           <td style="padding-left:20px;color:var(--gray-dark);font-size:12px">└ <span style="color:var(--purple);font-weight:700">第${li+1}筆</span></td>
-          <td></td>
+          <td style="font-size:11px;font-weight:700;color:${tAccColor}">${tAccLabel}</td>
           <td style="font-size:12px">${t.type}</td>
           <td style="font-size:12px">${t.buydate}</td>
           <td style="text-align:center;font-size:12px">${tDays}<span style="font-size:10px;color:var(--gray-dark)">日</span></td>
@@ -4121,14 +4229,19 @@ function agRenderClosedTrades() {
   const closed = agState.trades.filter(t => t.status === 'closed').slice().reverse();
   const el = document.getElementById('ag-closedTrades');
   if (!closed.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div>'; return; }
-  let html = `<table class="tbl"><tr><th>股票</th><th>主題</th><th>類型</th><th>買入日</th><th>賣出日</th><th>持倉天</th><th>買入價</th><th>賣出價</th><th>回報%</th><th>P&L(HK$)</th><th>勝負</th><th>操作</th></tr>`;
+  const lA2 = agState.accountLabelA || '戶口A';
+  const lB2 = agState.accountLabelB || '戶口B';
+  let html = `<table class="tbl"><tr><th>股票</th><th>戶口</th><th>主題</th><th>類型</th><th>買入日</th><th>賣出日</th><th>持倉天</th><th>買入價</th><th>賣出價</th><th>回報%</th><th>P&L(HK$)</th><th>勝負</th><th>操作</th></tr>`;
   closed.forEach(t => {
     const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
     const retPct = agCalcRetPct(t);
     const netHKD = agCalcNetPlHKD(t);
     const isWin = netHKD !== null ? netHKD > 0 : retPct !== null ? retPct > 0 : false;
+    const tAcc = t.account === 'B' ? lB2 : lA2;
+    const tAccColor = t.account === 'B' ? 'var(--purple)' : 'var(--blue-mid)';
     html += `<tr>
       <td><strong>${t.code}</strong></td>
+      <td style="font-size:11px;font-weight:700;color:${tAccColor}">${tAcc}</td>
       <td style="font-size:11px;color:var(--purple)">${t.theme || '—'}</td>
       <td>${t.type || '—'}</td>
       <td>${t.buydate}</td><td>${t.selldate || '—'}</td>
@@ -4226,14 +4339,17 @@ function agRenderRebalance() {
   const open = agState.trades.filter(t => t.status !== 'closed');
   const codes = [...new Set(open.map(t => t.code))];
   if (!codes.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div>'; return; }
-  const totalHKD = codes.reduce((s, code) => {
+  const posHKDTotal = codes.reduce((s, code) => {
     const lots = open.filter(t => t.code === code);
     const px = agState.currentPrices[code] || lots[0].buyprice;
     return s + agToHKD(px * lots.reduce((a, t) => a + Math.abs(t.shares), 0), code);
   }, 0);
+  const totalCashHKD2 = (agState.cashA || 0) + (agState.cashB || 0);
+  const grandTotal2 = posHKDTotal + totalCashHKD2;
+  const totalHKD = grandTotal2 > 0 ? grandTotal2 : posHKDTotal; // fallback if no cash entered
   const numPos = codes.length;
   const cashPct = agState.cashPct || 10;
-  const equalTarget = (100 - cashPct) / numPos;
+  const equalTarget = numPos > 0 ? (100 - cashPct) / numPos : 0;
   const threshold = agState.rebalanceThreshold || 25;
   // Sort by weight desc
   const weighted = codes.map(code => {
@@ -4244,9 +4360,10 @@ function agRenderRebalance() {
     return { code, weight: totalHKD > 0 ? posHKD / totalHKD * 100 : 0, posHKD, lots, theme: lots[0].theme || '—' };
   }).sort((a, b) => b.weight - a.weight);
 
+  const actualCashPct = totalHKD > 0 ? (totalCashHKD2 / totalHKD * 100).toFixed(1) : '—';
   let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px">
     <span>📌 目標平均比重：<strong>${equalTarget.toFixed(1)}%</strong></span>
-    <span>💰 現金目標：<strong>${cashPct}%</strong></span>
+    <span>💰 實際現金：<strong>${actualCashPct}%</strong>（目標 ${cashPct}%）</span>
     <span>⚠️ 再平衡閾值：<strong>${threshold}%</strong></span>
   </div>`;
   html += `<div style="overflow-x:auto"><table class="tbl"><tr><th>股票</th><th>主題</th><th>比重%</th><th>目標%</th><th>偏差</th><th>狀態</th><th>建議行動</th></tr>`;
@@ -4372,6 +4489,13 @@ function agRestoreSettings() {
   document.getElementById('ag-set-usd').value = agState.usdRate || 7.78;
   document.getElementById('ag-set-jpy').value = agState.jpyRate || 0.051;
   document.getElementById('ag-set-krw').value = agState.krwRate || 0.0057;
+  document.getElementById('ag-set-labelA').value = agState.accountLabelA || '戶口A';
+  document.getElementById('ag-set-labelB').value = agState.accountLabelB || '戶口B';
+  // Cash inputs
+  const cashAEl = document.getElementById('ag-cashA');
+  const cashBEl = document.getElementById('ag-cashB');
+  if (cashAEl) cashAEl.value = agState.cashA || '';
+  if (cashBEl) cashBEl.value = agState.cashB || '';
 }
 function agSaveSettings() {
   agState.currentTheme = document.getElementById('ag-set-theme').value.trim() || 'AI';
@@ -4382,7 +4506,9 @@ function agSaveSettings() {
   agState.usdRate = parseFloat(document.getElementById('ag-set-usd').value) || 7.78;
   agState.jpyRate = parseFloat(document.getElementById('ag-set-jpy').value) || 0.051;
   agState.krwRate = parseFloat(document.getElementById('ag-set-krw').value) || 0.0057;
-  agSave(); agRenderDashboard(); agRenderRebalance();
+  agState.accountLabelA = document.getElementById('ag-set-labelA').value.trim() || '戶口A';
+  agState.accountLabelB = document.getElementById('ag-set-labelB').value.trim() || '戶口B';
+  agSave(); agRenderDashboard(); agRenderRebalance(); agRenderOpenPositions(); agRenderClosedTrades();
 }
 
 // ── CLOUD SYNC ────────────────────────────────────────────────
@@ -4444,7 +4570,7 @@ function agImportJSON(event) {
   reader.readAsText(file);
 }
 function agClearAll() {
-  agState = { trades:[], currentPrices:{}, currentTheme:'AI', maxPositions:6, cashPct:10, rebalanceThreshold:25, usdRate:7.78, jpyRate:0.051, krwRate:0.0057, fees:{us:2.05,hk:55}, dailyPerf:[], quarterlyReviews:{} };
+  agState = { trades:[], currentPrices:{}, currentTheme:'AI', maxPositions:6, cashPct:10, rebalanceThreshold:25, usdRate:7.78, jpyRate:0.051, krwRate:0.0057, fees:{us:2.05,hk:55}, dailyPerf:[], quarterlyReviews:{}, cashA:0, cashB:0, accountLabelA:'戶口A', accountLabelB:'戶口B' };
   localStorage.removeItem('wilson_tracker_ag');
   agInit(); agRenderAll(); showToast('進取MODE數據已清除');
 }

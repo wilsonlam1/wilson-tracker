@@ -39,6 +39,24 @@
   #ag-mode-wrapper { padding:12px; }
   #ag-mode-wrapper .card-title { color: var(--purple); }
   .ag-rebal-alert { background:var(--red-light);border-left:4px solid var(--red);border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:13px; }
+  /* Rich Text Editor */
+  .ag-rte-wrap { border:1px solid var(--gray-mid);border-radius:8px;overflow:hidden;margin-bottom:4px; }
+  .ag-rte-toolbar { display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:#f4eef8;border-bottom:1px solid var(--gray-mid); }
+  .ag-rte-toolbar button { background:none;border:1px solid transparent;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:12px;min-width:24px;line-height:1.4;color:#333; }
+  .ag-rte-toolbar button:hover { background:#e0d0f0;border-color:#b39dcc; }
+  .ag-rte-toolbar .rte-sep { width:1px;background:#ccc;margin:2px 4px;align-self:stretch; }
+  .ag-rte-toolbar select { font-size:12px;padding:2px 4px;border:1px solid #bbb;border-radius:4px;background:#fff;cursor:pointer; }
+  .ag-rte-content { min-height:200px;padding:12px 14px;outline:none;font-size:14px;line-height:1.7;color:#222;background:#fff; }
+  .ag-rte-content:empty:before { content:attr(data-placeholder);color:#aaa;pointer-events:none; }
+  .ag-rte-content h1 { font-size:1.6em;font-weight:700;margin:12px 0 6px;color:var(--purple); }
+  .ag-rte-content h2 { font-size:1.3em;font-weight:700;margin:10px 0 5px;color:var(--purple); }
+  .ag-rte-content h3 { font-size:1.1em;font-weight:700;margin:8px 0 4px; }
+  .ag-rte-content ul,.ag-rte-content ol { padding-left:20px;margin:6px 0; }
+  .ag-rte-content blockquote { border-left:4px solid var(--purple);margin:8px 0;padding:6px 12px;background:#f9f4ff;color:#555;border-radius:0 6px 6px 0; }
+  .ag-sort-th { cursor:pointer;user-select:none;white-space:nowrap; }
+  .ag-sort-th:hover { background:rgba(108,52,131,0.12); }
+  .ag-sort-th .sort-arrow { font-size:9px;margin-left:2px;opacity:0.4; }
+  .ag-sort-th.active-sort .sort-arrow { opacity:1;color:var(--purple); }
 
   /* CARDS */
   .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -1177,7 +1195,7 @@
 
       <div class="form-group">
         <label>主題表現評估</label>
-        <textarea id="ag-q-theme-eval" style="height:80px" placeholder="這季主題（如AI）表現如何？哪些持倉貢獻最多/最少？"></textarea>
+        <textarea id="ag-q-theme-eval" style="height:60px" placeholder="這季主題（如AI）表現如何？哪些持倉貢獻最多/最少？"></textarea>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:10px">
         <input type="checkbox" id="ag-q-change-theme" onchange="document.getElementById('ag-q-new-theme-row').style.display=this.checked?'block':'none'">
@@ -1189,8 +1207,72 @@
       </div>
       <div class="form-group">
         <label>下季策略</label>
-        <textarea id="ag-q-strategy" style="height:80px" placeholder="下季持倉調整計劃、目標倉位、預期走勢..."></textarea>
+        <textarea id="ag-q-strategy" style="height:60px" placeholder="下季持倉調整計劃、目標倉位、預期走勢..."></textarea>
       </div>
+
+      <div class="form-group" style="margin-top:14px">
+        <label style="font-size:13px;font-weight:700;color:var(--purple)">📝 季度報告（富文本）</label>
+        <div class="ag-rte-wrap">
+          <div class="ag-rte-toolbar" id="ag-q-article-toolbar">
+            <select onchange="agQFontName('ag-q-article',this.value);this.value=''">
+              <option value="">字體</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Microsoft JhengHei">微軟正黑</option>
+            </select>
+            <select onchange="agQFontSize('ag-q-article',this.value);this.value=''">
+              <option value="">字型大小</option>
+              <option value="1">極小</option>
+              <option value="2">小</option>
+              <option value="3">正常</option>
+              <option value="4">中</option>
+              <option value="5">大</option>
+              <option value="6">特大</option>
+              <option value="7">最大</option>
+            </select>
+            <span class="rte-sep"></span>
+            <button onclick="agQExec('ag-q-article','bold')" title="粗體 (Ctrl+B)"><b>B</b></button>
+            <button onclick="agQExec('ag-q-article','italic')" title="斜體 (Ctrl+I)"><i>I</i></button>
+            <button onclick="agQExec('ag-q-article','underline')" title="底線 (Ctrl+U)"><u>U</u></button>
+            <button onclick="agQExec('ag-q-article','strikeThrough')" title="刪除線"><s>S</s></button>
+            <span class="rte-sep"></span>
+            <span style="font-size:11px;color:#888;padding:0 2px">顏色：</span>
+            <button onclick="agQColor('ag-q-article','#222222')" style="color:#222;font-weight:700;font-size:13px" title="黑">A</button>
+            <button onclick="agQColor('ag-q-article','#c0392b')" style="color:#c0392b;font-weight:700;font-size:13px" title="紅">A</button>
+            <button onclick="agQColor('ag-q-article','#27ae60')" style="color:#27ae60;font-weight:700;font-size:13px" title="綠">A</button>
+            <button onclick="agQColor('ag-q-article','#2980b9')" style="color:#2980b9;font-weight:700;font-size:13px" title="藍">A</button>
+            <button onclick="agQColor('ag-q-article','#6C3483')" style="color:#6C3483;font-weight:700;font-size:13px" title="紫">A</button>
+            <button onclick="agQColor('ag-q-article','#d35400')" style="color:#d35400;font-weight:700;font-size:13px" title="橙">A</button>
+            <span class="rte-sep"></span>
+            <span style="font-size:11px;color:#888;padding:0 2px">底色：</span>
+            <button onclick="agQHilite('ag-q-article','#fff176')" style="background:#fff176;border:1px solid #ccc" title="黃底">▌</button>
+            <button onclick="agQHilite('ag-q-article','#b3e5fc')" style="background:#b3e5fc;border:1px solid #ccc" title="藍底">▌</button>
+            <button onclick="agQHilite('ag-q-article','#c8e6c9')" style="background:#c8e6c9;border:1px solid #ccc" title="綠底">▌</button>
+            <button onclick="agQHilite('ag-q-article','#f8bbd0')" style="background:#f8bbd0;border:1px solid #ccc" title="粉底">▌</button>
+            <button onclick="agQHilite('ag-q-article','transparent')" style="font-size:10px" title="清除底色">✕底</button>
+            <span class="rte-sep"></span>
+            <button onclick="agQExec('ag-q-article','justifyLeft')" title="靠左">⬅</button>
+            <button onclick="agQExec('ag-q-article','justifyCenter')" title="置中">≡</button>
+            <button onclick="agQExec('ag-q-article','justifyRight')" title="靠右">➡</button>
+            <span class="rte-sep"></span>
+            <button onclick="agQExec('ag-q-article','insertUnorderedList')" title="項目清單">• ≡</button>
+            <button onclick="agQExec('ag-q-article','insertOrderedList')" title="編號清單">1. ≡</button>
+            <button onclick="agQInsertQuote('ag-q-article')" title="引言區塊">❝</button>
+            <button onclick="agQExec('ag-q-article','insertHorizontalRule')" title="水平分隔線">─</button>
+            <span class="rte-sep"></span>
+            <button onclick="agQExec('ag-q-article','removeFormat')" title="清除格式" style="font-size:10px">✕格式</button>
+            <button onclick="agQExec('ag-q-article','undo')" title="復原 (Ctrl+Z)">↩</button>
+            <button onclick="agQExec('ag-q-article','redo')" title="重做 (Ctrl+Y)">↪</button>
+          </div>
+          <div id="ag-q-article" class="ag-rte-content" contenteditable="true"
+            data-placeholder="在此撰寫季度報告…可調整字型、顏色、插入清單等"
+            oninput="agQMarkDirty()"></div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#aaa;margin-top:3px" id="ag-rte-dirty"></div>
+      </div>
+
       <button class="btn btn-primary" onclick="agSaveQuarterly()">💾 儲存季度回顧</button>
     </div>
 
@@ -3940,26 +4022,33 @@ function agRenderDashboard() {
   if (!codes.length) { ovEl.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:8px 0">暫無持倉</div>'; return; }
   const threshold = agState.rebalanceThreshold || 25;
   const equalTarget = totalHKD > 0 ? (100 - (agState.cashPct || 10)) / numPos : 0;
+  const ovRows = codes.map(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr2 = agState.currentPrices[code];
+    const px2 = curr2 || lots[0].buyprice;
+    const shares2 = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
+    const posHKD2 = agToHKD(px2 * shares2, code);
+    const weight2 = totalHKD > 0 ? (posHKD2 / totalHKD * 100) : 0;
+    const pnlHKD2 = curr2 ? lots.reduce((s, t) => { const pl = agCalcPnlAmt(t, curr2); return s + (pl !== null ? agToHKD(pl, t.code) : 0); }, 0) : null;
+    const pnlPct2 = curr2 ? lots.reduce((s, t) => s + (agCalcPnlPct(t, curr2) || 0), 0) / lots.length : null;
+    return { code, lots, curr: curr2, px: px2, shares: shares2, posHKD: posHKD2, weight: weight2, pnlHKD: pnlHKD2, pnlPct: pnlPct2, theme: lots[0].theme || agState.currentTheme || '—' };
+  });
+  const ovGetters = {
+    code: r => r.code, theme: r => r.theme, curr: r => r.curr || 0,
+    pnlPct: r => r.pnlPct, pnlHKD: r => r.pnlHKD,
+    weight: r => r.weight, dev: r => r.weight - equalTarget
+  };
+  const sortedOvRows = agSortArr(ovRows, agSortState.overview.col, agSortState.overview.dir, ovGetters);
   let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
-    <th>股票</th><th>主題</th><th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th style="text-align:center">比重%</th><th>目標%</th><th>偏差</th><th>操作</th></tr>`;
+    ${agTh('overview','code','股票')}${agTh('overview','theme','主題')}${agTh('overview','curr','現價')}${agTh('overview','pnlPct','盈虧%')}${agTh('overview','pnlHKD','盈虧HK$')}${agTh('overview','weight','比重%','text-align:center')}<th>目標%</th>${agTh('overview','dev','偏差')}<th>操作</th></tr>`;
   // Rebalance alerts
   let alerts = '';
-  codes.forEach(code => {
-    const lots = open.filter(t => t.code === code);
-    const curr = agState.currentPrices[code];
-    const px = curr || lots[0].buyprice;
-    const shares = lots.reduce((s, t) => s + Math.abs(t.shares || 0), 0);
-    const posHKD = agToHKD(px * shares, code);
-    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100) : 0;
+  sortedOvRows.forEach(({ code, lots, curr, px, shares, posHKD: posHKD2, weight: weight2, pnlHKD, pnlPct, theme }) => {
+    const posHKD = posHKD2;
+    const weight = weight2;
     const dev = weight - equalTarget;
-    const pnlHKD = curr ? lots.reduce((s, t) => {
-      const pl = agCalcPnlAmt(t, curr);
-      return s + (pl !== null ? agToHKD(pl, t.code) : 0);
-    }, 0) : null;
-    const pnlPct = curr ? lots.reduce((s, t) => s + (agCalcPnlPct(t, curr) || 0), 0) / lots.length : null;
     const wColor = weight > threshold ? 'var(--red)' : weight > equalTarget * 1.1 ? 'var(--amber)' : 'var(--green)';
     const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
-    const theme = lots[0].theme || agState.currentTheme || '—';
     if (weight > threshold) alerts += `<div class="ag-rebal-alert">⚠️ <strong>${code}</strong> 佔比 <strong>${weight.toFixed(1)}%</strong>，超過閾值 ${threshold}%。建議減持至約 ${equalTarget.toFixed(1)}%（即減少約 ${((weight - equalTarget) / 100 * posHKD / (curr || px)).toFixed(0)} 股）</div>`;
     html += `<tr>
       <td><strong>${code}</strong></td>
@@ -4113,6 +4202,40 @@ function agDeleteTrade(id) {
 }
 
 let agExpandedGroups = new Set();
+let agSortState = {
+  overview: { col: null, dir: 1 },
+  open:     { col: null, dir: 1 },
+  closed:   { col: 'selldate', dir: -1 },
+  daily:    { col: 'date', dir: -1 },
+  rebal:    { col: 'weight', dir: -1 }
+};
+function agSortBy(table, col) {
+  const s = agSortState[table];
+  if (s.col === col) { s.dir = -s.dir; }
+  else { s.col = col; s.dir = (col === 'date' || col === 'selldate' || col === 'buydate') ? -1 : 1; }
+  if (table === 'overview') agRenderDashboard();
+  else if (table === 'open')   agRenderOpenPositions();
+  else if (table === 'closed') agRenderClosedTrades();
+  else if (table === 'daily')  agRenderDailyHistory();
+  else if (table === 'rebal')  agRenderRebalance();
+}
+function agTh(table, col, label, extraStyle) {
+  const s = agSortState[table];
+  const isActive = s.col === col;
+  const arrow = isActive ? (s.dir === 1 ? '\u25b2' : '\u25bc') : '\u21c5';
+  return `<th class="ag-sort-th${isActive ? ' active-sort' : ''}" onclick="agSortBy('${table}','${col}')"${extraStyle ? ` style="${extraStyle}"` : ''}>${label} <span class="sort-arrow">${arrow}</span></th>`;
+}
+function agSortArr(arr, col, dir, getters) {
+  if (!col || !getters[col]) return arr;
+  const fn = getters[col];
+  return [...arr].sort((a, b) => {
+    const av = fn(a), bv = fn(b);
+    if (av === null || av === undefined || av === '\u2014' || av === '') return 1;
+    if (bv === null || bv === undefined || bv === '\u2014' || bv === '') return -1;
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * (av - bv);
+  });
+}
 function agToggleGroup(code) {
   agExpandedGroups.has(code) ? agExpandedGroups.delete(code) : agExpandedGroups.add(code);
   agRenderOpenPositions();
@@ -4162,27 +4285,41 @@ function agRenderOpenPositions() {
   // Update account select options labels
   const accSel = document.getElementById('ag-t-account');
   if (accSel) { accSel.options[0].text = lA; accSel.options[1].text = lB; }
-  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
-    <th>股票</th><th>戶口</th><th>主題</th><th>類型</th><th>買入日</th><th>持倉天</th><th>均價</th><th>股數</th>
-    <th>現價</th><th>盈虧%</th><th>盈虧HK$</th><th>比重%</th><th>操作</th></tr>`;
-
-  codes.forEach(code => {
+  const opRows = codes.map(code => {
     const lots = open.filter(t => t.code === code);
-    const hasMultiple = lots.length > 1;
-    const isExpanded = agExpandedGroups.has(code);
     const curr = agState.currentPrices[code];
     const totalShares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
     const avgBuy = lots.reduce((s, t) => s + t.buyprice * Math.abs(t.shares), 0) / totalShares;
     const px = curr || avgBuy;
     const posHKD = agToHKD(px * totalShares, code);
-    const weight = totalHKD > 0 ? (posHKD / totalHKD * 100).toFixed(1) : '—';
-    const wNum = parseFloat(weight);
-    const wColor = wNum > thresh ? 'var(--red)' : 'var(--blue-mid)';
+    const weight = totalHKD > 0 ? posHKD / totalHKD * 100 : 0;
     const pnlHKD = curr ? lots.reduce((s, t) => s + agToHKD(agCalcPnlAmt(t, curr) || 0, t.code), 0) : null;
     const pnlPct = curr ? lots.reduce((s, t) => s + (agCalcPnlPct(t, curr) || 0), 0) / lots.length : null;
+    const firstDate = lots.slice().sort((a,b) => (a.buydate||'').localeCompare(b.buydate||''))[0].buydate || '';
+    const daysSince = firstDate ? Math.round((new Date() - new Date(firstDate)) / 86400000) : null;
+    const acc = lots.every(t => (t.account||'A') === (lots[0].account||'A')) ? (lots[0].account || 'A') : 'AB';
+    return { code, lots, curr, avgBuy, totalShares, px, posHKD, weight, pnlHKD, pnlPct, firstDate, daysSince, acc, theme: lots[0].theme || '—' };
+  });
+  const opGetters = {
+    code: r => r.code, account: r => r.acc, theme: r => r.theme,
+    type: r => r.lots[0].type, buydate: r => r.firstDate || '',
+    days: r => r.daysSince, avgBuy: r => r.avgBuy, shares: r => r.totalShares,
+    curr: r => r.curr || 0, pnlPct: r => r.pnlPct, pnlHKD: r => r.pnlHKD, weight: r => r.weight
+  };
+  const sortedOpRows = agSortArr(opRows, agSortState.open.col, agSortState.open.dir, opGetters);
+  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
+    ${agTh('open','code','股票')}${agTh('open','account','戶口')}${agTh('open','theme','主題')}${agTh('open','type','類型')}${agTh('open','buydate','買入日')}${agTh('open','days','持倉天')}${agTh('open','avgBuy','均價')}${agTh('open','shares','股數')}
+    ${agTh('open','curr','現價')}${agTh('open','pnlPct','盈虧%')}${agTh('open','pnlHKD','盈虧HK$')}${agTh('open','weight','比重%')}<th>操作</th></tr>`;
+
+  sortedOpRows.forEach(({ code, lots, curr, avgBuy, totalShares, px, posHKD, weight: wRaw, pnlHKD, pnlPct, firstDate: fd, daysSince: dsRaw }) => {
+    const hasMultiple = lots.length > 1;
+    const isExpanded = agExpandedGroups.has(code);
+    const weight = totalHKD > 0 ? wRaw.toFixed(1) : '—';
+    const wNum = wRaw;
+    const wColor = wNum > thresh ? 'var(--red)' : 'var(--blue-mid)';
     const pColor = pnlHKD !== null ? (pnlHKD >= 0 ? 'var(--green)' : 'var(--red)') : '';
-    const firstDate = lots.slice().sort((a,b) => (a.buydate||'').localeCompare(b.buydate||''))[0].buydate || '—';
-    const daysSince = firstDate !== '—' ? Math.round((new Date() - new Date(firstDate)) / 86400000) : '—';
+    const firstDate = fd || '—';
+    const daysSince = dsRaw !== null ? dsRaw : '—';
 
     // ── SUMMARY ROW ──
     const accLabel = lots.every(t => (t.account||'A') === (lots[0].account||'A'))
@@ -4258,8 +4395,16 @@ function agRenderClosedTrades() {
   if (!closed.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無已平倉記錄</div>'; return; }
   const lA2 = agState.accountLabelA || '戶口A';
   const lB2 = agState.accountLabelB || '戶口B';
-  let html = `<table class="tbl"><tr><th>股票</th><th>戶口</th><th>主題</th><th>類型</th><th>買入日</th><th>賣出日</th><th>持倉天</th><th>買入價</th><th>賣出價</th><th>回報%</th><th>P&L(HK$)</th><th>勝負</th><th>操作</th></tr>`;
-  closed.forEach(t => {
+  const clGetters = {
+    code: t => t.code, account: t => t.account || 'A', theme: t => t.theme || '',
+    type: t => t.type || '', buydate: t => t.buydate || '', selldate: t => t.selldate || '',
+    days: t => (t.selldate && t.buydate) ? Math.round((new Date(t.selldate)-new Date(t.buydate))/86400000) : null,
+    buyprice: t => t.buyprice, sellprice: t => t.sellprice || 0,
+    retPct: t => agCalcRetPct(t), netHKD: t => agCalcNetPlHKD(t)
+  };
+  const sortedClosed = agSortArr(closed, agSortState.closed.col, agSortState.closed.dir, clGetters);
+  let html = `<table class="tbl"><tr>${agTh('closed','code','股票')}${agTh('closed','account','戶口')}${agTh('closed','theme','主題')}${agTh('closed','type','類型')}${agTh('closed','buydate','買入日')}${agTh('closed','selldate','賣出日')}${agTh('closed','days','持倉天')}${agTh('closed','buyprice','買入價')}${agTh('closed','sellprice','賣出價')}${agTh('closed','retPct','回報%')}${agTh('closed','netHKD','P&L(HK$)')}<th>勝負</th><th>操作</th></tr>`;
+  sortedClosed.forEach(t => {
     const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
     const retPct = agCalcRetPct(t);
     const netHKD = agCalcNetPlHKD(t);
@@ -4433,12 +4578,18 @@ function agSaveDailyPerf() {
 
 function agRenderDailyHistory() {
   const el = document.getElementById('ag-dp-history');
-  const dp = (agState.dailyPerf || []).slice().reverse();
+  const dpAll2 = (agState.dailyPerf || []).slice();
+  const all = dpAll2.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const dpGetters = {
+    date:   r => r.date,
+    total:  r => r.total,
+    dayChg: r => { const idx2 = all.findIndex(x => x.date === r.date); const prev2 = idx2 > 0 ? all[idx2-1] : null; return prev2 ? (r.total - prev2.total) / prev2.total * 100 : null; }
+  };
+  const dp = agSortArr(dpAll2, agSortState.daily.col || 'date', agSortState.daily.dir, dpGetters);
   if (!dp.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div>'; return; }
   const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
   const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
-  let html = `<div style="overflow-x:auto"><table class="tbl"><tr><th>日期</th><th>組合總值 (HK$)</th><th>日變動</th><th>倉位變動</th><th>備注</th><th>操作</th></tr>`;
-  const all = agState.dailyPerf.slice().sort((a,b) => a.date.localeCompare(b.date));
+  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>${agTh('daily','date','日期')}${agTh('daily','total','組合總值 (HK$)')}${agTh('daily','dayChg','日變動')}<th>倉位變動</th><th>備注</th><th>操作</th></tr>`;
   dp.forEach(r => {
     const idx = all.findIndex(x => x.date === r.date);
     const prev = idx > 0 ? all[idx - 1] : null;
@@ -4516,14 +4667,17 @@ function agRenderRebalance() {
   const cashPct = agState.cashPct || 10;
   const equalTarget = numPos > 0 ? (100 - cashPct) / numPos : 0;
   const threshold = agState.rebalanceThreshold || 25;
-  // Sort by weight desc
-  const weighted = codes.map(code => {
+  const rebalGetters = {
+    code: r => r.code, theme: r => r.theme,
+    weight: r => r.weight, dev: r => r.weight - equalTarget
+  };
+  const weighted = agSortArr(codes.map(code => {
     const lots = open.filter(t => t.code === code);
     const px = agState.currentPrices[code] || lots[0].buyprice;
     const shares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
     const posHKD = agToHKD(px * shares, code);
     return { code, weight: totalHKD > 0 ? posHKD / totalHKD * 100 : 0, posHKD, lots, theme: lots[0].theme || '—' };
-  }).sort((a, b) => b.weight - a.weight);
+  }), agSortState.rebal.col || 'weight', agSortState.rebal.dir, rebalGetters);
 
   const actualCashPct = totalHKD > 0 ? (totalCashHKD2 / totalHKD * 100).toFixed(1) : '—';
   let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px">
@@ -4531,7 +4685,7 @@ function agRenderRebalance() {
     <span>💰 實際現金：<strong>${actualCashPct}%</strong>（目標 ${cashPct}%）</span>
     <span>⚠️ 再平衡閾值：<strong>${threshold}%</strong></span>
   </div>`;
-  html += `<div style="overflow-x:auto"><table class="tbl"><tr><th>股票</th><th>主題</th><th>比重%</th><th>目標%</th><th>偏差</th><th>狀態</th><th>建議行動</th></tr>`;
+  html += `<div style="overflow-x:auto"><table class="tbl"><tr>${agTh('rebal','code','股票')}${agTh('rebal','theme','主題')}${agTh('rebal','weight','比重%')}<th>目標%</th>${agTh('rebal','dev','偏差')}<th>狀態</th><th>建議行動</th></tr>`;
   weighted.forEach(({ code, weight, posHKD, lots, theme }) => {
     const dev = weight - equalTarget;
     const curr = agState.currentPrices[code];
@@ -4576,6 +4730,10 @@ function agLoadQuarterly() {
   document.getElementById('ag-q-new-theme-row').style.display = r.changeTheme ? 'block' : 'none';
   document.getElementById('ag-q-new-theme').value = r.newTheme || '';
   document.getElementById('ag-q-strategy').value = r.strategy || '';
+  const artEl2 = document.getElementById('ag-q-article');
+  if (artEl2) artEl2.innerHTML = r.article || '';
+  const dirtyEl2 = document.getElementById('ag-rte-dirty');
+  if (dirtyEl2) dirtyEl2.textContent = '';
   agShowQuarterStats(key);
 }
 function agClearQuarterlyForm() {
@@ -4583,6 +4741,10 @@ function agClearQuarterlyForm() {
   document.getElementById('ag-q-change-theme').checked = false;
   document.getElementById('ag-q-new-theme-row').style.display = 'none';
   document.getElementById('ag-q-stats').style.display = 'none';
+  const artEl3 = document.getElementById('ag-q-article');
+  if (artEl3) artEl3.innerHTML = '';
+  const dirtyEl3 = document.getElementById('ag-rte-dirty');
+  if (dirtyEl3) dirtyEl3.textContent = '';
   agShowQuarterStats(agGetQuarterKey());
 }
 function agShowQuarterStats(key) {
@@ -4605,15 +4767,48 @@ function agShowQuarterStats(key) {
     贏：${wins.length} / 輸：${closed.length - wins.length}`;
   el.style.display = 'block';
 }
+// ── RICH TEXT EDITOR (Quarterly) ──────────────────────────────
+function agQExec(id, cmd) {
+  document.getElementById(id).focus();
+  document.execCommand(cmd, false, null);
+}
+function agQFontSize(id, size) {
+  document.getElementById(id).focus();
+  document.execCommand('fontSize', false, size);
+}
+function agQFontName(id, name) {
+  if (!name) return;
+  document.getElementById(id).focus();
+  document.execCommand('fontName', false, name);
+}
+function agQColor(id, color) {
+  document.getElementById(id).focus();
+  document.execCommand('foreColor', false, color);
+}
+function agQHilite(id, color) {
+  document.getElementById(id).focus();
+  document.execCommand('hiliteColor', false, color);
+}
+function agQInsertQuote(id) {
+  document.getElementById(id).focus();
+  document.execCommand('formatBlock', false, 'blockquote');
+}
+function agQMarkDirty() {
+  const el = document.getElementById('ag-rte-dirty');
+  if (el) el.textContent = '未儲存的變更';
+}
+
 function agSaveQuarterly() {
   const key = agGetQuarterKey();
   if (!agState.quarterlyReviews) agState.quarterlyReviews = {};
   const changeTheme = document.getElementById('ag-q-change-theme').checked;
+  const artEl = document.getElementById('ag-q-article');
   agState.quarterlyReviews[key] = {
     themeEval: document.getElementById('ag-q-theme-eval').value.trim(),
     changeTheme,
     newTheme: changeTheme ? document.getElementById('ag-q-new-theme').value.trim() : '',
     strategy: document.getElementById('ag-q-strategy').value.trim(),
+    article: artEl ? artEl.innerHTML : '',
     savedAt: new Date().toISOString(),
   };
   if (changeTheme && agState.quarterlyReviews[key].newTheme) {
@@ -4621,6 +4816,8 @@ function agSaveQuarterly() {
     showToast(`主題已更新為「${agState.currentTheme}」`);
   }
   agSave(); agRenderQuarterlyHistory();
+  const dirtyEl = document.getElementById('ag-rte-dirty');
+  if (dirtyEl) dirtyEl.textContent = '';
   showToast(`${key} 季度回顧已儲存 ✅`);
 }
 function agRenderQuarterlyHistory() {
@@ -4637,7 +4834,12 @@ function agRenderQuarterlyHistory() {
         ${r.changeTheme && r.newTheme ? `<span style="background:var(--purple);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px">換主題→${r.newTheme}</span>` : ''}
       </div>
       ${r.themeEval ? `<div style="font-size:12px;color:var(--gray-dark);margin-bottom:4px"><strong>主題評估：</strong>${r.themeEval}</div>` : ''}
-      ${r.strategy ? `<div style="font-size:12px;color:var(--gray-dark)"><strong>下季策略：</strong>${r.strategy}</div>` : ''}
+      ${r.strategy ? `<div style="font-size:12px;color:var(--gray-dark);margin-bottom:4px"><strong>下季策略：</strong>${r.strategy}</div>` : ''}
+      ${r.article && r.article.replace(/<[^>]*>/g,'').trim() ? `
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--purple);font-weight:600">📝 季度報告</summary>
+          <div style="margin-top:8px;padding:10px;background:#faf5ff;border-radius:6px;font-size:13px;line-height:1.7;border:1px solid var(--purple-light)">${r.article}</div>
+        </details>` : ''}
     </div>`;
   });
   el.innerHTML = html;

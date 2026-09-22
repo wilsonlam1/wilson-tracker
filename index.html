@@ -1104,11 +1104,31 @@
           <label style="font-size:11px">日期</label>
           <input type="date" id="ag-dp-date">
         </div>
-        <div style="flex:0 0 160px">
+        <div style="flex:0 0 180px">
           <label style="font-size:11px">組合總值 (HK$)</label>
           <input type="number" id="ag-dp-total" placeholder="0">
         </div>
+        <div style="align-self:flex-end">
+          <button class="btn btn-ghost btn-sm" onclick="agDpAutoFill()">🔄 自動填入</button>
+        </div>
       </div>
+
+      <div style="background:var(--gray);border-radius:6px;padding:10px;margin-bottom:10px;font-size:12px" id="ag-dp-breakdown">
+        <span style="color:var(--gray-dark)">按「自動填入」計算持倉＋現金合計</span>
+      </div>
+
+      <!-- Position changes -->
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">今日倉位變動</label>
+        <div id="ag-dp-changes-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="agDpAddChange('open')">➕ 新增倉位</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--amber)" onclick="agDpAddChange('partial')">📉 部分平倉</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="agDpAddChange('close')">✖️ 全倉平倉</button>
+          <button class="btn btn-ghost btn-sm" onclick="agDpAutoDetectChanges()">🔍 自動偵測今日變動</button>
+        </div>
+      </div>
+
       <div class="form-group">
         <label style="font-size:12px">備注</label>
         <textarea id="ag-dp-note" style="height:40px" placeholder="市場觀察、調倉原因..."></textarea>
@@ -3741,6 +3761,9 @@ function agInit() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('ag-t-buydate').value = today;
   document.getElementById('ag-dp-date').value = today;
+  agDpChanges = [];
+  document.getElementById('ag-dp-changes-list').innerHTML = '';
+  agDpAutoFill();
   // Populate year selector
   const yearSel = document.getElementById('ag-q-year');
   const curYear = new Date().getFullYear();
@@ -3771,6 +3794,10 @@ function agShowTab(name) {
   document.getElementById('tab-' + name).style.display = 'block';
   event.target.classList.add('active');
   if (name === 'ag-rebalance') agRenderRebalance();
+  if (name === 'ag-daily') {
+    // Auto-fill total on tab open
+    setTimeout(agDpAutoFill, 300);
+  }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -4288,19 +4315,119 @@ function agExportClosedCSV() {
 }
 
 // ── DAILY PERFORMANCE ─────────────────────────────────────────
+let agDpChanges = [];
+
+function agDpAutoFill() {
+  // Compute positions value from current prices
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  const codes = [...new Set(open.map(t => t.code))];
+  let posHKD = 0;
+  const breakdown = [];
+  codes.forEach(code => {
+    const lots = open.filter(t => t.code === code);
+    const curr = agState.currentPrices[code];
+    const px = curr || lots[0].buyprice;
+    const shares = lots.reduce((s, t) => s + Math.abs(t.shares), 0);
+    const val = agToHKD(px * shares, code);
+    posHKD += val;
+    breakdown.push(`${code}: HK$${Math.round(val).toLocaleString()}${!curr ? ' (估)' : ''}`);
+  });
+  const cashA = agState.cashA || 0;
+  const cashB = agState.cashB || 0;
+  const total = posHKD + cashA + cashB;
+  document.getElementById('ag-dp-total').value = Math.round(total) || '';
+  const lA = agState.accountLabelA || '戶口A';
+  const lB = agState.accountLabelB || '戶口B';
+  const bdEl = document.getElementById('ag-dp-breakdown');
+  if (bdEl) {
+    bdEl.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px">
+      <span>📈 持倉：<strong>HK$${Math.round(posHKD).toLocaleString()}</strong></span>
+      <span>💵 ${lA}現金：<strong>HK$${Math.round(cashA).toLocaleString()}</strong></span>
+      <span>💵 ${lB}現金：<strong>HK$${Math.round(cashB).toLocaleString()}</strong></span>
+      <span style="color:var(--green);font-weight:700">合計：HK$${Math.round(total).toLocaleString()}</span>
+    </div>
+    ${breakdown.length ? `<div style="font-size:11px;color:var(--gray-dark);margin-top:4px">${breakdown.join(' · ')}</div>` : ''}`;
+  }
+  if (!codes.length && !cashA && !cashB) showToast('暫無持倉及現金數據');
+  else showToast('✅ 已自動填入合計');
+}
+
+function agDpAddChange(type) {
+  const labels = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+  const colors = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  const placeholder = type === 'open' ? '例：NVDA 50股 @ US$130' : '例：AAPL 30股 @ US$220';
+  const id = Date.now();
+  agDpChanges.push({ id, type, text: '' });
+  const list = document.getElementById('ag-dp-changes-list');
+  const row = document.createElement('div');
+  row.id = `ag-dpchange-${id}`;
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = `
+    <span style="font-size:12px;color:${colors[type]};white-space:nowrap;min-width:70px">${labels[type]}</span>
+    <input type="text" placeholder="${placeholder}"
+      style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+      oninput="agDpChanges.find(c=>c.id===${id}).text=this.value">
+    <button onclick="agDpRemoveChange(${id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+  list.appendChild(row);
+}
+
+function agDpRemoveChange(id) {
+  agDpChanges = agDpChanges.filter(c => c.id !== id);
+  const el = document.getElementById(`ag-dpchange-${id}`);
+  if (el) el.remove();
+}
+
+function agDpAutoDetectChanges() {
+  const today = document.getElementById('ag-dp-date').value || new Date().toISOString().split('T')[0];
+  const opened = agState.trades.filter(t => t.buydate === today && t.status !== 'closed');
+  const closed = agState.trades.filter(t => t.selldate === today && t.status === 'closed');
+  opened.forEach(t => {
+    agDpChanges.push({ id: Date.now() + Math.random(), type: 'open', text: `${t.code} ${t.shares}股 @ ${t.buyprice}` });
+  });
+  closed.forEach(t => {
+    agDpChanges.push({ id: Date.now() + Math.random(), type: 'close', text: `${t.code} ${t.shares}股 @ ${t.sellprice}` });
+  });
+  // Re-render list
+  const list = document.getElementById('ag-dp-changes-list');
+  list.innerHTML = '';
+  const labels = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+  const colors = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  agDpChanges.forEach(c => {
+    const row = document.createElement('div');
+    row.id = `ag-dpchange-${c.id}`;
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    row.innerHTML = `
+      <span style="font-size:12px;color:${colors[c.type]};white-space:nowrap;min-width:70px">${labels[c.type]}</span>
+      <input type="text" value="${c.text}"
+        style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+        oninput="agDpChanges.find(x=>x.id===${c.id}).text=this.value">
+      <button onclick="agDpRemoveChange(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+    list.appendChild(row);
+  });
+  if (!opened.length && !closed.length) showToast('今日暫無交易記錄');
+  else showToast(`偵測到 ${opened.length} 新增, ${closed.length} 平倉 ✅`);
+}
+
 function agSaveDailyPerf() {
   const date = document.getElementById('ag-dp-date').value;
   const total = parseFloat(document.getElementById('ag-dp-total').value);
   const note = document.getElementById('ag-dp-note').value.trim();
   if (!date || !total) { showToast('請填寫日期和組合總值'); return; }
   if (!agState.dailyPerf) agState.dailyPerf = [];
+  const changes = agDpChanges.filter(c => c.text.trim()).map(c => ({ type: c.type, text: c.text.trim() }));
   const existing = agState.dailyPerf.findIndex(r => r.date === date);
-  const entry = { date, total, note };
+  const entry = { date, total, note, changes };
   if (existing >= 0) agState.dailyPerf[existing] = entry;
   else agState.dailyPerf.push(entry);
   agState.dailyPerf.sort((a, b) => a.date.localeCompare(b.date));
   agSave(); agRenderDailyHistory();
+  // Reset form
   document.getElementById('ag-dp-note').value = '';
+  document.getElementById('ag-dp-changes-list').innerHTML = '';
+  agDpChanges = [];
+  document.getElementById('ag-dp-edit-banner').style.display = 'none';
+  const bdEl = document.getElementById('ag-dp-breakdown');
+  if (bdEl) bdEl.innerHTML = '<span style="color:var(--gray-dark);font-size:12px">按「自動填入」計算持倉＋現金合計</span>';
   showToast(`${date} 記錄已儲存 ✅`);
 }
 
@@ -4308,23 +4435,61 @@ function agRenderDailyHistory() {
   const el = document.getElementById('ag-dp-history');
   const dp = (agState.dailyPerf || []).slice().reverse();
   if (!dp.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div>'; return; }
-  let html = `<table class="tbl"><tr><th>日期</th><th>組合總值 (HK$)</th><th>日變動</th><th>備注</th><th>操作</th></tr>`;
+  const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
+  let html = `<div style="overflow-x:auto"><table class="tbl"><tr><th>日期</th><th>組合總值 (HK$)</th><th>日變動</th><th>倉位變動</th><th>備注</th><th>操作</th></tr>`;
   const all = agState.dailyPerf.slice().sort((a,b) => a.date.localeCompare(b.date));
   dp.forEach(r => {
     const idx = all.findIndex(x => x.date === r.date);
     const prev = idx > 0 ? all[idx - 1] : null;
     const dayChg = prev ? ((r.total - prev.total) / prev.total * 100) : null;
     const chgColor = dayChg !== null ? (dayChg >= 0 ? 'var(--green)' : 'var(--red)') : '';
+    const changesHtml = r.changes && r.changes.length
+      ? r.changes.map(c => `<span style="color:${typeColor[c.type]||'#555'};font-size:11px">${typeLabel[c.type]||''} ${c.text}</span>`).join('<br>')
+      : '';
+    const noteHtml = r.note ? `<div style="font-size:10px;color:var(--gray-dark);margin-top:${changesHtml?'3px':'0'}">📝 ${r.note}</div>` : '';
+    const cellContent = changesHtml || noteHtml ? changesHtml + noteHtml : '<span style="color:#aaa;font-size:11px">無</span>';
     html += `<tr>
-      <td>${r.date}</td>
+      <td style="white-space:nowrap">${r.date}</td>
       <td style="font-weight:700">HK$${Math.round(r.total).toLocaleString()}</td>
-      <td style="color:${chgColor};font-weight:700">${dayChg !== null ? (dayChg >= 0 ? '+' : '') + dayChg.toFixed(2) + '%' : '—'}</td>
-      <td style="font-size:12px;color:var(--gray-dark)">${r.note || '—'}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="agDeleteDailyEntry('${r.date}')" style="color:var(--red);padding:2px 5px">🗑️</button></td>
+      <td style="color:${chgColor};font-weight:700;white-space:nowrap">${dayChg !== null ? (dayChg >= 0 ? '+' : '') + dayChg.toFixed(2) + '%' : '—'}</td>
+      <td style="font-size:12px;min-width:120px">${cellContent}</td>
+      <td style="font-size:12px;color:var(--gray-dark);max-width:150px">${r.note || ''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="agDpLoadEdit('${r.date}')" title="編輯" style="padding:2px 5px">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="agDeleteDailyEntry('${r.date}')" title="刪除" style="padding:2px 5px;color:var(--red);margin-left:2px">🗑️</button>
+      </td>
     </tr>`;
   });
-  html += '</table>';
+  html += '</table></div>';
   el.innerHTML = html;
+}
+
+function agDpLoadEdit(date) {
+  const r = agState.dailyPerf?.find(x => x.date === date);
+  if (!r) return;
+  document.getElementById('ag-dp-date').value = r.date;
+  document.getElementById('ag-dp-total').value = r.total || '';
+  document.getElementById('ag-dp-note').value = r.note || '';
+  // Restore changes
+  agDpChanges = (r.changes || []).map(c => ({ ...c, id: Date.now() + Math.random() }));
+  document.getElementById('ag-dp-changes-list').innerHTML = '';
+  const labels = { open: '➕ 新增', partial: '📉 部分平倉', close: '✖️ 全倉平倉' };
+  const colors = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
+  agDpChanges.forEach(c => {
+    const row = document.createElement('div');
+    row.id = `ag-dpchange-${c.id}`;
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    row.innerHTML = `<span style="font-size:12px;color:${colors[c.type]||'#555'};white-space:nowrap;min-width:70px">${labels[c.type]||c.type}</span>
+      <input type="text" value="${c.text}" style="flex:1;padding:5px 8px;border:1px solid var(--gray-mid);border-radius:5px;font-size:12px"
+        oninput="agDpChanges.find(x=>x.id===${c.id}).text=this.value">
+      <button onclick="agDpRemoveChange(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">✕</button>`;
+    document.getElementById('ag-dp-changes-list').appendChild(row);
+  });
+  const banner = document.getElementById('ag-dp-edit-banner');
+  if (banner) { banner.textContent = `✏️ 正在編輯：${date}　修改後請按「💾 儲存今日記錄」`; banner.style.display = 'block'; }
+  document.getElementById('tab-ag-daily').querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast(`已載入 ${date} 記錄`);
 }
 
 function agDeleteDailyEntry(date) {

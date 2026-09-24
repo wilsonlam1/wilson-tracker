@@ -5035,7 +5035,7 @@ async function agPullFromCloud() {
   try {
     // Cache-bust: force fresh fetch from GitHub
     const r = await fetch(`https://api.github.com/gists/${id}?t=${Date.now()}`, {
-      headers: { ...gistHeaders(token), 'Cache-Control': 'no-cache' },
+      headers: gistHeaders(token),
       signal: AbortSignal.timeout(20000)
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);

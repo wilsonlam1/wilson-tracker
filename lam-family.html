@@ -4010,8 +4010,8 @@ function agRenderDashboard() {
   // Restore cash inputs if not already set by user
   const cashAInput = document.getElementById('ag-cashA');
   const cashBInput = document.getElementById('ag-cashB');
-  if (cashAInput && cashAInput.value === '') cashAInput.value = agState.cashA || '';
-  if (cashBInput && cashBInput.value === '') cashBInput.value = agState.cashB || '';
+  if (cashAInput && document.activeElement !== cashAInput) cashAInput.value = agState.cashA || '';
+  if (cashBInput && document.activeElement !== cashBInput) cashBInput.value = agState.cashB || '';
 
   // Compute positions HKD value
   let totalHKD = 0;
@@ -4150,6 +4150,8 @@ function agSaveCash() {
   agSave();
   agRenderDashboard();
   agRenderRebalance();
+  // Immediately push cash to cloud
+  (function() { const { token, id } = getAgGistCreds(); if (token && id) agPushToCloud(true); })();
 }
 
 function agUpdatePrice(code, val) {
@@ -4992,22 +4994,26 @@ function agSaveSettings() {
 
 // ── SMART MERGE: merge two agState objects without data loss ──
 function agSmartMerge(local, remote) {
-  // trades: union by id, remote wins on conflict
+  // Decide which state is "newer" for scalar fields (cashA, cashB, settings, etc.)
+  const localTime  = new Date(local.lastModified  || 0).getTime();
+  const remoteTime = new Date(remote.lastModified || 0).getTime();
+  const base  = remoteTime >= localTime ? remote : local;   // newer wins for scalars
+  const other = remoteTime >= localTime ? local  : remote;
+  // trades: union by id, base (newer) wins on conflict
   const tradeMap = {};
-  (local.trades || []).forEach(t => { tradeMap[t.id] = t; });
-  (remote.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  (other.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  (base.trades  || []).forEach(t => { tradeMap[t.id] = t; });
   const trades = Object.values(tradeMap).sort((a, b) => a.id - b.id);
-  // dailyPerf: union by date, remote wins on conflict
+  // dailyPerf: union by date, base wins on conflict
   const dpMap = {};
-  (local.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
-  (remote.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  (other.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  (base.dailyPerf  || []).forEach(r => { dpMap[r.date] = r; });
   const dailyPerf = Object.values(dpMap).sort((a, b) => a.date.localeCompare(b.date));
-  // quarterlyReviews: union by key, remote wins
-  const quarterlyReviews = Object.assign({}, local.quarterlyReviews || {}, remote.quarterlyReviews || {});
-  // currentPrices: merge, remote wins
-  const currentPrices = Object.assign({}, local.currentPrices || {}, remote.currentPrices || {});
-  // scalar fields: remote wins, fallback to local
-  return { ...local, ...remote, trades, dailyPerf, quarterlyReviews, currentPrices };
+  // quarterlyReviews, currentPrices: union, base wins
+  const quarterlyReviews = Object.assign({}, other.quarterlyReviews || {}, base.quarterlyReviews || {});
+  const currentPrices    = Object.assign({}, other.currentPrices    || {}, base.currentPrices    || {});
+  // All scalar fields (cashA, cashB, settings…) come from the newer state
+  return { ...base, trades, dailyPerf, quarterlyReviews, currentPrices };
 }
 
 async function agPushToCloud(silent = false) {

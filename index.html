@@ -1528,6 +1528,7 @@ let state = {
 
 let _autoSyncTimer = null;
 function save() {
+  state.lastModified = new Date().toISOString();
   localStorage.setItem('wilson_tracker', JSON.stringify(state));
   // Auto-push to cloud after 5s debounce
   if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
@@ -3090,32 +3091,56 @@ async function pushToCloud(silent = false) {
     setFloatSync('☁️❌', 'var(--red)');
   }
 }
+
+// ── SMART MERGE: merge two conservative state objects without data loss ──
+function smartMerge(local, remote) {
+  // trades: union by id, remote wins on conflict
+  const tradeMap = {};
+  (local.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  (remote.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  const trades = Object.values(tradeMap).sort((a, b) => a.id - b.id);
+  // dailyPerf: union by date, remote wins
+  const dpMap = {};
+  (local.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  (remote.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  const dailyPerf = Object.values(dpMap).sort((a, b) => a.date.localeCompare(b.date));
+  // scores, reviews, monthlyComments: union by key, remote wins
+  const scores = Object.assign({}, local.scores || {}, remote.scores || {});
+  const reviews = Object.assign({}, local.reviews || {}, remote.reviews || {});
+  const monthlyComments = Object.assign({}, local.monthlyComments || {}, remote.monthlyComments || {});
+  const currentPrices = Object.assign({}, local.currentPrices || {}, remote.currentPrices || {});
+  return { ...local, ...remote, trades, dailyPerf, scores, reviews, monthlyComments, currentPrices };
+}
+
 async function pullFromCloud() {
   const { token, id } = getGistCreds();
   if (!token || !id) { setSyncStatus('請先填入 Token 及 Gist ID', true); return; }
-  if (!confirm('從雲端載入會覆蓋本機所有數據，確定繼續？')) return;
-  setSyncStatus('⏳ 載入中...', false);
+  setSyncStatus('⏳ 從雲端載入中...', false);
   try {
-    const r = await fetch(`https://api.github.com/gists/${id}`, {
-      headers: gistHeaders(token),
+    // Cache-bust: force fresh fetch from GitHub
+    const r = await fetch(`https://api.github.com/gists/${id}?t=${Date.now()}`, {
+      headers: { ...gistHeaders(token), 'Cache-Control': 'no-cache' },
       signal: AbortSignal.timeout(20000)
     });
     if (!r.ok) { const e = await r.json(); throw new Error(`HTTP ${r.status}: ${e.message || ''}`); }
     const d = await r.json();
     const file = d.files && d.files['wilson_tracker.json'];
     if (!file) throw new Error('找不到 wilson_tracker.json');
-    // If content is truncated, fetch raw_url
     const content = file.truncated
       ? await (await fetch(file.raw_url, { signal: AbortSignal.timeout(20000) })).text()
       : file.content;
     const remote = JSON.parse(content);
     if (!remote || typeof remote !== 'object') throw new Error('數據格式錯誤');
-    state = { ...state, ...remote };
+    const localTime = state.lastModified ? new Date(state.lastModified).toLocaleString('zh-HK') : '未知';
+    const remoteTime = remote.lastModified ? new Date(remote.lastModified).toLocaleString('zh-HK') : '未知';
+    if (!confirm(`從雲端智能合併（不丟失任何一方數據）\n\n本機最後儲存：${localTime}\n雲端最後推送：${remoteTime}\n\n確定合併？`)) return;
+    state = smartMerge(state, remote);
+    state.lastModified = new Date().toISOString();
     save();
     renderAll();
     const now = new Date().toLocaleString('zh-HK');
-    setSyncStatus(`✅ 已從雲端載入 (${now})`, false);
-    showToast('從雲端載入成功 ✅');
+    setSyncStatus(`✅ 智能合併完成 (${now})`, false);
+    showToast('數據已智能合併 ✅');
   } catch(e) {
     setSyncStatus('❌ 載入失敗：' + e.message, true);
   }
@@ -3802,6 +3827,7 @@ function agLoad() {
   agTradeIdCounter = agState.trades.length ? Math.max(...agState.trades.map(t => t.id)) + 1 : 1;
 }
 function agSave() {
+  agState.lastModified = new Date().toISOString();
   localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
   if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
   _autoSyncTimer = setTimeout(() => {
@@ -4566,6 +4592,8 @@ function agSaveDailyPerf() {
   else agState.dailyPerf.push(entry);
   agState.dailyPerf.sort((a, b) => a.date.localeCompare(b.date));
   agSave(); agRenderDailyHistory();
+  // Immediately push to cloud so other devices get the update
+  (function() { const { token, id } = getGistCreds(); if (token && id) agPushToCloud(true); })();
   // Reset form
   document.getElementById('ag-dp-note').value = '';
   document.getElementById('ag-dp-changes-list').innerHTML = '';
@@ -4879,6 +4907,27 @@ function agSaveSettings() {
 }
 
 // ── CLOUD SYNC ────────────────────────────────────────────────
+
+// ── SMART MERGE: merge two agState objects without data loss ──
+function agSmartMerge(local, remote) {
+  // trades: union by id, remote wins on conflict
+  const tradeMap = {};
+  (local.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  (remote.trades || []).forEach(t => { tradeMap[t.id] = t; });
+  const trades = Object.values(tradeMap).sort((a, b) => a.id - b.id);
+  // dailyPerf: union by date, remote wins on conflict
+  const dpMap = {};
+  (local.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  (remote.dailyPerf || []).forEach(r => { dpMap[r.date] = r; });
+  const dailyPerf = Object.values(dpMap).sort((a, b) => a.date.localeCompare(b.date));
+  // quarterlyReviews: union by key, remote wins
+  const quarterlyReviews = Object.assign({}, local.quarterlyReviews || {}, remote.quarterlyReviews || {});
+  // currentPrices: merge, remote wins
+  const currentPrices = Object.assign({}, local.currentPrices || {}, remote.currentPrices || {});
+  // scalar fields: remote wins, fallback to local
+  return { ...local, ...remote, trades, dailyPerf, quarterlyReviews, currentPrices };
+}
+
 async function agPushToCloud(silent = false) {
   const { token, id } = getGistCreds();
   if (!token || !id) { if (!silent) document.getElementById('ag-syncStatus').textContent = '請先在保守MODE設定中填入 Token 及 Gist ID'; return; }
@@ -4902,17 +4951,28 @@ async function agPullFromCloud() {
   if (!token || !id) { document.getElementById('ag-syncStatus').textContent = '請先在保守MODE設定中填入 Token 及 Gist ID'; return; }
   document.getElementById('ag-syncStatus').textContent = '⏳ 載入中...';
   try {
-    const r = await fetch(`https://api.github.com/gists/${id}`, { headers: gistHeaders(token) });
+    // Cache-bust: force fresh fetch from GitHub
+    const r = await fetch(`https://api.github.com/gists/${id}?t=${Date.now()}`, {
+      headers: { ...gistHeaders(token), 'Cache-Control': 'no-cache' },
+      signal: AbortSignal.timeout(20000)
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    const content = data.files?.['wilson_tracker_ag.json']?.content;
-    if (!content) { document.getElementById('ag-syncStatus').textContent = '雲端無進取MODE數據'; return; }
-    if (!confirm('確定從雲端載入進取MODE數據？本地數據將被覆蓋。')) return;
-    agState = JSON.parse(content);
+    const file = data.files?.['wilson_tracker_ag.json'];
+    if (!file) { document.getElementById('ag-syncStatus').textContent = '雲端無進取MODE數據'; return; }
+    const rawContent = file.truncated
+      ? await (await fetch(file.raw_url, { signal: AbortSignal.timeout(20000) })).text()
+      : file.content;
+    const remote = JSON.parse(rawContent);
+    const localTime = agState.lastModified ? new Date(agState.lastModified).toLocaleString('zh-HK') : '未知';
+    const remoteTime = remote.lastModified ? new Date(remote.lastModified).toLocaleString('zh-HK') : '未知';
+    if (!confirm(`從雲端智能合併（不丟失任何一方數據）\n\n本機最後儲存：${localTime}\n雲端最後推送：${remoteTime}\n\n確定合併？`)) return;
+    agState = agSmartMerge(agState, remote);
+    agState.lastModified = new Date().toISOString();
     localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
     agInit(); agRenderAll();
-    document.getElementById('ag-syncStatus').textContent = `✅ 已從雲端載入 (${new Date().toLocaleString('zh-HK')})`;
-    showToast('進取MODE數據已從雲端載入 ✅');
+    document.getElementById('ag-syncStatus').textContent = `✅ 智能合併完成 (${new Date().toLocaleString('zh-HK')})`;
+    showToast('數據已智能合併 ✅');
   } catch(e) {
     document.getElementById('ag-syncStatus').textContent = '❌ 載入失敗：' + e.message;
   }

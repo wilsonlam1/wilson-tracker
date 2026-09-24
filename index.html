@@ -4106,8 +4106,7 @@ function agSaveCash() {
   agSave();
   agRenderDashboard();
   agRenderRebalance();
-  // Immediately push cash to cloud
-  (function() { const { token, id } = getGistCreds(); if (token && id) agPushToCloud(true); })();
+  // Note: push is debounced via agSave() (5-sec) to avoid race conditions from oninput
 }
 
 function agUpdatePrice(code, val) {
@@ -4915,8 +4914,9 @@ function agSmartMerge(local, remote) {
   // Decide which state is "newer" for scalar fields (cashA, cashB, settings, etc.)
   const localTime  = new Date(local.lastModified  || 0).getTime();
   const remoteTime = new Date(remote.lastModified || 0).getTime();
-  const base  = remoteTime >= localTime ? remote : local;   // newer wins for scalars
-  const other = remoteTime >= localTime ? local  : remote;
+  // remote wins when: it has no lastModified (old Gist), or it's genuinely newer
+  const base  = (!remote.lastModified || remoteTime >= localTime) ? remote : local;
+  const other = (!remote.lastModified || remoteTime >= localTime) ? local  : remote;
   // trades: union by id, base (newer) wins on conflict
   const tradeMap = {};
   (other.trades || []).forEach(t => { tradeMap[t.id] = t; });
@@ -4974,7 +4974,6 @@ async function agPullFromCloud() {
     const remoteTime = remote.lastModified ? new Date(remote.lastModified).toLocaleString('zh-HK') : '未知';
     if (!confirm(`從雲端智能合併（不丟失任何一方數據）\n\n本機最後儲存：${localTime}\n雲端最後推送：${remoteTime}\n\n確定合併？`)) return;
     agState = agSmartMerge(agState, remote);
-    agState.lastModified = new Date().toISOString();
     localStorage.setItem('wilson_tracker_ag', JSON.stringify(agState));
     agInit(); agRenderAll();
     document.getElementById('ag-syncStatus').textContent = `✅ 智能合併完成 (${new Date().toLocaleString('zh-HK')})`;

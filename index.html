@@ -2,7 +2,7 @@
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Wilson 投資追蹤系統</title>
 <style>
   :root {
@@ -182,9 +182,69 @@
   .rule-card { background: var(--red-light); border-left: 4px solid var(--red); border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; font-size: 13px; }
   .rule-card.ok { background: var(--green-light); border-color: var(--green); }
 
+  /* TABLE SCROLL WRAPPER */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* ── MOBILE ── */
   @media (max-width: 700px) {
-    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-    .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    /* grid layouts */
+    .grid-4 { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 8px; }
+    .form-row, .form-row-3 { grid-template-columns: 1fr; gap: 6px; }
+
+    /* header */
+    header { padding: 8px 12px; gap: 8px; }
+    header h1 { font-size: 14px; }
+    header .date { font-size: 11px; margin-left: 4px; }
+
+    /* nav */
+    nav button { padding: 9px 10px; font-size: 11px; }
+    #nav-aggressive button { padding: 9px 10px; font-size: 11px; }
+
+    /* main / wrapper */
+    main { padding: 8px; }
+    #ag-mode-wrapper { padding: 8px !important; }
+
+    /* cards */
+    .card { padding: 12px; margin-bottom: 8px; border-radius: 8px; }
+    .card-title { font-size: 13px; margin-bottom: 8px; }
+
+    /* stat boxes */
+    .stat-box { padding: 10px 8px; }
+    .stat-box .value { font-size: 20px; }
+    .stat-box .label { font-size: 10px; }
+    .stat-box .sub { font-size: 10px; }
+
+    /* INPUTS: 16px prevents iOS Safari auto-zoom */
+    input, select, textarea { font-size: 16px !important; padding: 10px 12px; min-height: 44px; }
+    textarea { min-height: 80px; }
+
+    /* buttons: 44px min touch target */
+    .btn { padding: 10px 16px; font-size: 14px; min-height: 44px; }
+    .btn-sm { padding: 8px 12px; font-size: 13px; min-height: 36px; }
+
+    /* score buttons */
+    .score-btn { width: 40px; height: 40px; font-size: 15px; }
+    .score-row { padding: 10px; gap: 8px; }
+    .score-row .q { font-size: 12px; }
+
+    /* tables */
+    .tbl-wrap { margin: 0 -4px; border-radius: 0; }
+    .tbl { font-size: 12px; }
+    .tbl th, .tbl td { padding: 6px 7px; white-space: nowrap; }
+
+    /* RTE toolbar: scroll horizontally instead of wrap */
+    .ag-rte-toolbar { overflow-x: auto; flex-wrap: nowrap; padding: 4px 6px; -webkit-overflow-scrolling: touch; }
+    .ag-rte-toolbar button { min-width: 28px; padding: 4px 6px; font-size: 13px; }
+
+    /* body bottom padding so content is not hidden behind float buttons */
+    body { padding-bottom: 130px; }
+
+    /* toast: full-width centered, higher up to clear float buttons */
+    #toast { bottom: 135px; right: 12px; left: 12px; text-align: center; border-radius: 8px; }
+
+    /* modals: full-width on mobile */
+    .modal-inner { width: 96vw !important; max-width: 96vw !important; padding: 16px !important; }
   }
 </style>
 </head>
@@ -497,13 +557,13 @@
 
   <div class="card">
     <div class="card-title">📋 操作模式速查</div>
-    <table class="tbl">
+    <div class="tbl-wrap"><table class="tbl">
       <tr><th>總分</th><th>模式</th><th>最多持股</th><th>槓桿上限</th><th>說明</th></tr>
       <tr><td><strong style="color:var(--green)">7-8</strong></td><td><span class="mode-badge mode-attack" style="font-size:12px">進攻</span></td><td>12-15隻</td><td>1.2x</td><td>積極入市，A桶可滿配</td></tr>
       <tr><td><strong style="color:var(--blue-mid)">5-6</strong></td><td><span class="mode-badge mode-balance" style="font-size:12px">平衡</span></td><td>8-10隻</td><td>1.0x</td><td>正常操作，不加槓桿</td></tr>
       <tr><td><strong style="color:var(--amber)">3-4</strong></td><td><span class="mode-badge mode-defend" style="font-size:12px">防守</span></td><td>4-6隻</td><td>0x</td><td>縮減B桶，保護A桶</td></tr>
       <tr><td><strong style="color:var(--red)">0-2</strong></td><td><span class="mode-badge mode-rest" style="font-size:12px">休息</span></td><td>0-2隻</td><td>0x</td><td>全面休息，最多保留A桶核心</td></tr>
-    </table>
+    </table></div>
   </div>
 </div>
 
@@ -549,7 +609,7 @@
   <div class="card">
     <div class="card-title">🪣 各桶建倉規則</div>
     <div style="overflow-x:auto">
-    <table class="tbl">
+    <div class="tbl-wrap"><table class="tbl">
       <tr>
         <th style="width:100px">桶別</th>
         <th>目標佔比</th>
@@ -600,7 +660,7 @@
         <td style="color:var(--green)">不設止蝕</td>
         <td>升值後毋須減倉<br>讓贏家跑</td>
       </tr>
-    </table>
+    </table></div>
     </div>
   </div>
 
@@ -634,14 +694,14 @@
   <!-- 移動止蝕規則 -->
   <div class="card">
     <div class="card-title">📈 移動止蝕規則（Trailing Stop）</div>
-    <table class="tbl">
+    <div class="tbl-wrap"><table class="tbl">
       <tr><th>持倉升幅</th><th>止蝕上移至</th><th>原理</th></tr>
       <tr><td><strong>+10%</strong></td><td style="color:var(--green);font-weight:700">買入點 +2%（保本）</td><td>確保這筆交易不虧損</td></tr>
       <tr><td><strong>+20%</strong></td><td style="color:var(--green);font-weight:700">買入點 +10%</td><td>鎖定部分利潤</td></tr>
       <tr><td><strong>+30%</strong></td><td style="color:var(--green);font-weight:700">買入點 +20%</td><td>繼續讓利潤奔跑</td></tr>
       <tr><td><strong>每升5%</strong></td><td style="color:var(--green);font-weight:700">距當前價 -8%</td><td>持續移動，保護大部分利潤</td></tr>
       <tr style="background:var(--red-light)"><td colspan="3" style="color:var(--red);font-weight:700;text-align:center">🚫 嚴禁在 +5% 至 +15% 範圍內主動賣出！這是過去虧損的最大根源。</td></tr>
-    </table>
+    </table></div>
   </div>
 
   <!-- 加碼規則 -->
@@ -667,12 +727,12 @@
   <!-- 行業集中度 -->
   <div class="card">
     <div class="card-title">🏭 行業集中度規則</div>
-    <table class="tbl">
+    <div class="tbl-wrap"><table class="tbl">
       <tr><th>規則</th><th>說明</th></tr>
       <tr><td style="color:var(--red);font-weight:700">同一行業 ≤ 2隻</td><td>B桶不可同時持有超過2隻同Sector股票（例：不可同時持NVDA+AMD+MU三隻半導體）</td></tr>
       <tr><td style="color:var(--amber);font-weight:700">半導體行業上限 30%</td><td>A+B桶半導體類（含SMH/DRAM）合計不超過組合30%</td></tr>
       <tr><td style="color:var(--blue-mid);font-weight:700">ETF不計入行業限制</td><td>QQQ、SMH等ETF不計入個股行業集中度計算</td></tr>
-    </table>
+    </table></div>
   </div>
 
 </div>
@@ -727,13 +787,13 @@
 
   <div class="card">
     <div class="card-title">⚡ 熔斷機制參考</div>
-    <table class="tbl">
+    <div class="tbl-wrap"><table class="tbl">
       <tr><th>回撤閾值</th><th>立即執行</th><th>嚴禁</th></tr>
       <tr><td style="color:var(--amber);font-weight:700">-10%</td><td>停止B桶新倉，檢視A桶</td><td>不可加碼任何倉位</td></tr>
       <tr><td style="color:var(--amber);font-weight:700">-15%</td><td>A桶減至2隻，B桶全清，去槓桿</td><td>不可開任何新倉</td></tr>
       <tr><td style="color:var(--red);font-weight:700">-20%</td><td>A桶剩1隻，現金≥50%</td><td>不可任何買入</td></tr>
       <tr><td style="color:var(--red);font-weight:700;background:var(--red-light)">-25%</td><td style="background:var(--red-light);color:var(--red);font-weight:700">全部清倉，100%現金，休息2週</td><td style="background:var(--red-light)">絕對不能有例外</td></tr>
-    </table>
+    </table></div>
   </div>
 </div>
 
@@ -2448,7 +2508,7 @@ function renderOpenPositions() {
   const thBg = 'background:#1a3a5c';
   const oTh = (col, label) =>
     `<th style="${thBg};cursor:pointer;user-select:none;white-space:nowrap" onclick="sortOpenTh('${col}')">${label}${openArrow(col)}</th>`;
-  let html = `<table class="tbl"><tr>
+  let html = `<div class="tbl-wrap"><table class="tbl"><tr>
     ${oTh('code','股票')}${oTh('bucket','桶')}<th>類型</th>
     ${oTh('firstDate','最早買入')}${oTh('days','持倉日')}
     ${oTh('avgBuy','均買價')}${oTh('shares','總股數')}
@@ -2563,7 +2623,7 @@ function renderOpenPositions() {
     }
   });
 
-  html += '</table>';
+  html += '</table></div>';
   el.innerHTML = html;
   renderDashPnL();
 }
@@ -2644,7 +2704,7 @@ function renderClosedTrades() {
       <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(1)" ${closedTradesPage >= totalPages-1 ? 'disabled style="opacity:0.4"' : ''}>下頁 ▶</button>
     </div>
   </div>`;
-  html += `<table class="tbl"><tr>
+  html += `<div class="tbl-wrap"><table class="tbl"><tr>
     ${thSort('股票','code',tid)}${thSort('桶','bucket',tid)}${thSort('類型','type',tid)}
     ${thSort('買入日','buydate',tid)}${thSort('賣出日','selldate',tid)}
     ${thSort('持倉日','days',tid)}
@@ -2681,7 +2741,7 @@ function renderClosedTrades() {
       </td>
     </tr>`;
   });
-  html += '</table>';
+  html += '</table></div>';
   if (totalPages > 1) {
     html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px">
       <button class="btn btn-ghost btn-sm" onclick="changeClosedPage(-1)" ${closedTradesPage === 0 ? 'disabled style="opacity:0.4"' : ''}>◀ 上頁</button>
@@ -3545,7 +3605,7 @@ function renderDailyHistory() {
   }
   const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
   const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
-  let html = `<table class="tbl"><tr>
+  let html = `<div class="tbl-wrap"><table class="tbl"><tr>
     <th>日期</th><th>組合值</th><th>日變動</th>
     <th>E桶 ETF</th>
     <th>G桶 增長股</th>
@@ -3594,7 +3654,7 @@ function renderDailyHistory() {
       </td>
     </tr>`;
   });
-  html += '</table>';
+  html += '</table></div>';
   el.innerHTML = html;
 }
 
@@ -3726,7 +3786,7 @@ function renderMonthlyPerf() {
   const tdStyle = (align='right') => `padding:7px 10px;font-size:12px;text-align:${align};white-space:nowrap;border-bottom:1px solid var(--gray)`;
   const pct = (v, dec=1) => v !== null ? `${v>=0?'+':''}${v.toFixed(dec)}%` : '—';
 
-  let html = `<table class="tbl" style="min-width:900px;border-collapse:collapse">
+  let html = `<div class="tbl-wrap"><table class="tbl" style="min-width:900px;border-collapse:collapse">
   <thead><tr style="background:var(--blue);color:#fff">
     ${thS('month','Month')}
     ${thS('total','Total','Trades')}
@@ -3782,7 +3842,7 @@ function renderMonthlyPerf() {
     </tr>`;
   });
 
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
@@ -3885,6 +3945,11 @@ function agInit() {
   // Set current quarter
   const curQ = 'Q' + Math.ceil((new Date().getMonth() + 1) / 3);
   document.getElementById('ag-q-quarter').value = curQ;
+  // Show dashboard tab by default (CSS hides all .ag-tab)
+  document.querySelectorAll('.ag-tab').forEach(t => t.style.display = 'none');
+  document.getElementById('tab-ag-dashboard').style.display = 'block';
+  document.querySelectorAll('#nav-aggressive button').forEach(b => b.classList.remove('active'));
+  document.querySelector('#nav-aggressive button').classList.add('active');
 }
 
 function agRenderAll() {
@@ -4065,7 +4130,7 @@ function agRenderDashboard() {
     weight: r => r.weight, dev: r => r.weight - equalTarget
   };
   const sortedOvRows = agSortArr(ovRows, agSortState.overview.col, agSortState.overview.dir, ovGetters);
-  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
+  let html = `<div style="overflow-x:auto"><div class="tbl-wrap"><table class="tbl"><tr>
     ${agTh('overview','code','股票')}${agTh('overview','theme','主題')}${agTh('overview','curr','現價')}${agTh('overview','pnlPct','盈虧%')}${agTh('overview','pnlHKD','盈虧HK$')}${agTh('overview','weight','比重%','text-align:center')}<th>目標%</th>${agTh('overview','dev','偏差')}<th>操作</th></tr>`;
   // Rebalance alerts
   let alerts = '';
@@ -4095,7 +4160,7 @@ function agRenderDashboard() {
       </td>
     </tr>`;
   });
-  html += '</table></div>';
+  html += '</table></div></div>';
   ovEl.innerHTML = html;
   document.getElementById('ag-rebalance-alerts').innerHTML = alerts;
 }
@@ -4190,15 +4255,45 @@ function agAddTrade() {
   showToast(`${code} 已加入記錄 ✅`);
 }
 
+let agCloseTradeId = null;
 function agCloseTrade(id) {
   const t = agState.trades.find(t => t.id === id);
   if (!t) return;
-  const sp = prompt(`平倉 ${t.code}（買入價：${t.buyprice}）\n請輸入賣出價格：`);
-  if (!sp) return;
-  const sd = prompt('賣出日期 (YYYY-MM-DD)：', new Date().toISOString().split('T')[0]);
-  if (!sd) return;
-  t.sellprice = parseFloat(sp); t.selldate = sd; t.status = 'closed';
-  agSave(); agRenderAll(); showToast(`${t.code} 已平倉 ✅`);
+  agCloseTradeId = id;
+  document.getElementById('agCloseTitle').textContent = `💰 平倉 ${t.code}`;
+  document.getElementById('agCloseInfo').textContent =
+    `${t.type} · 買入 ${t.buyprice} · 持有 ${t.shares} 股`;
+  document.getElementById('agCloseMaxShares').textContent = t.shares;
+  document.getElementById('agCloseShares').value = t.shares;
+  document.getElementById('agCloseShares').max = t.shares;
+  document.getElementById('agClosePrice').value = agState.currentPrices?.[t.code] || '';
+  document.getElementById('agCloseDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('agCloseModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('agClosePrice').focus(), 100);
+}
+function agConfirmClose() {
+  const t = agState.trades.find(t => t.id === agCloseTradeId);
+  if (!t) return;
+  const sellShares = parseInt(document.getElementById('agCloseShares').value);
+  const sellPrice  = parseFloat(document.getElementById('agClosePrice').value);
+  const sellDate   = document.getElementById('agCloseDate').value;
+  if (!sellShares || sellShares <= 0 || sellShares > t.shares) { showToast('請輸入有效的賣出股數'); return; }
+  if (!sellPrice  || sellPrice  <= 0) { showToast('請輸入賣出價格'); return; }
+  if (!sellDate) { showToast('請輸入賣出日期'); return; }
+  document.getElementById('agCloseModal').style.display = 'none';
+  if (sellShares === t.shares) {
+    // Full close
+    t.sellprice = sellPrice; t.selldate = sellDate; t.status = 'closed';
+    agSave(); agRenderAll(); showToast(`${t.code} 已全倉平倉 ✅`);
+  } else {
+    // Partial close: shrink original, add closed lot
+    const closedLot = { ...t, id: Date.now(), shares: sellShares, sellprice: sellPrice,
+      selldate: sellDate, status: 'closed',
+      note: (t.note ? t.note + ' | ' : '') + `部分平倉 ${sellShares}/${t.shares}股` };
+    t.shares -= sellShares;
+    agState.trades.push(closedLot);
+    agSave(); agRenderAll(); showToast(`${t.code} 部分平倉 ${sellShares} 股 ✅`);
+  }
 }
 
 function agEditTrade(id) {
@@ -4334,7 +4429,7 @@ function agRenderOpenPositions() {
     curr: r => r.curr || 0, pnlPct: r => r.pnlPct, pnlHKD: r => r.pnlHKD, weight: r => r.weight
   };
   const sortedOpRows = agSortArr(opRows, agSortState.open.col, agSortState.open.dir, opGetters);
-  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>
+  let html = `<div style="overflow-x:auto"><div class="tbl-wrap"><table class="tbl"><tr>
     ${agTh('open','code','股票')}${agTh('open','account','戶口')}${agTh('open','theme','主題')}${agTh('open','type','類型')}${agTh('open','buydate','買入日')}${agTh('open','days','持倉天')}${agTh('open','avgBuy','均價')}${agTh('open','shares','股數')}
     ${agTh('open','curr','現價')}${agTh('open','pnlPct','盈虧%')}${agTh('open','pnlHKD','盈虧HK$')}${agTh('open','weight','比重%')}<th>操作</th></tr>`;
 
@@ -4412,7 +4507,7 @@ function agRenderOpenPositions() {
       });
     }
   });
-  html += '</table></div>';
+  html += '</table></div></div>';
   el.innerHTML = html;
 }
 
@@ -4430,7 +4525,7 @@ function agRenderClosedTrades() {
     retPct: t => agCalcRetPct(t), netHKD: t => agCalcNetPlHKD(t)
   };
   const sortedClosed = agSortArr(closed, agSortState.closed.col, agSortState.closed.dir, clGetters);
-  let html = `<table class="tbl"><tr>${agTh('closed','code','股票')}${agTh('closed','account','戶口')}${agTh('closed','theme','主題')}${agTh('closed','type','類型')}${agTh('closed','buydate','買入日')}${agTh('closed','selldate','賣出日')}${agTh('closed','days','持倉天')}${agTh('closed','buyprice','買入價')}${agTh('closed','sellprice','賣出價')}${agTh('closed','retPct','回報%')}${agTh('closed','netHKD','P&L(HK$)')}<th>勝負</th><th>操作</th></tr>`;
+  let html = `<div class="tbl-wrap"><table class="tbl"><tr>${agTh('closed','code','股票')}${agTh('closed','account','戶口')}${agTh('closed','theme','主題')}${agTh('closed','type','類型')}${agTh('closed','buydate','買入日')}${agTh('closed','selldate','賣出日')}${agTh('closed','days','持倉天')}${agTh('closed','buyprice','買入價')}${agTh('closed','sellprice','賣出價')}${agTh('closed','retPct','回報%')}${agTh('closed','netHKD','P&L(HK$)')}<th>勝負</th><th>操作</th></tr>`;
   sortedClosed.forEach(t => {
     const days = t.selldate && t.buydate ? Math.round((new Date(t.selldate) - new Date(t.buydate)) / 86400000) : '—';
     const retPct = agCalcRetPct(t);
@@ -4455,7 +4550,7 @@ function agRenderClosedTrades() {
       </td>
     </tr>`;
   });
-  html += '</table>';
+  html += '</table></div>';
   el.innerHTML = html;
 }
 
@@ -4618,7 +4713,7 @@ function agRenderDailyHistory() {
   if (!dp.length) { el.innerHTML = '<div style="color:var(--gray-dark);font-size:13px;padding:12px 0">暫無記錄</div>'; return; }
   const typeColor = { open: 'var(--green)', partial: 'var(--amber)', close: 'var(--red)' };
   const typeLabel = { open: '➕', partial: '📉', close: '✖️' };
-  let html = `<div style="overflow-x:auto"><table class="tbl"><tr>${agTh('daily','date','日期')}${agTh('daily','total','組合總值 (HK$)')}${agTh('daily','dayChg','日變動')}<th>倉位變動</th><th>備注</th><th>操作</th></tr>`;
+  let html = `<div style="overflow-x:auto"><div class="tbl-wrap"><table class="tbl"><tr>${agTh('daily','date','日期')}${agTh('daily','total','組合總值 (HK$)')}${agTh('daily','dayChg','日變動')}<th>倉位變動</th><th>備注</th><th>操作</th></tr>`;
   dp.forEach(r => {
     const idx = all.findIndex(x => x.date === r.date);
     const prev = idx > 0 ? all[idx - 1] : null;
@@ -4641,7 +4736,7 @@ function agRenderDailyHistory() {
       </td>
     </tr>`;
   });
-  html += '</table></div>';
+  html += '</table></div></div>';
   el.innerHTML = html;
 }
 
@@ -4714,7 +4809,7 @@ function agRenderRebalance() {
     <span>💰 實際現金：<strong>${actualCashPct}%</strong>（目標 ${cashPct}%）</span>
     <span>⚠️ 再平衡閾值：<strong>${threshold}%</strong></span>
   </div>`;
-  html += `<div style="overflow-x:auto"><table class="tbl"><tr>${agTh('rebal','code','股票')}${agTh('rebal','theme','主題')}${agTh('rebal','weight','比重%')}<th>目標%</th>${agTh('rebal','dev','偏差')}<th>狀態</th><th>建議行動</th></tr>`;
+  html += `<div style="overflow-x:auto"><div class="tbl-wrap"><table class="tbl"><tr>${agTh('rebal','code','股票')}${agTh('rebal','theme','主題')}${agTh('rebal','weight','比重%')}<th>目標%</th>${agTh('rebal','dev','偏差')}<th>狀態</th><th>建議行動</th></tr>`;
   weighted.forEach(({ code, weight, posHKD, lots, theme }) => {
     const dev = weight - equalTarget;
     const curr = agState.currentPrices[code];
@@ -4741,7 +4836,7 @@ function agRenderRebalance() {
       <td style="font-size:12px;color:var(--gray-dark)">${suggestion}</td>
     </tr>`;
   });
-  html += '</table></div>';
+  html += '</table></div></div>';
   el.innerHTML = html;
 }
 
@@ -5024,12 +5119,37 @@ function agClearAll() {
 </div>
 
 <!-- Floating cloud sync buttons (always visible, mobile-friendly) -->
-<div style="position:fixed;bottom:20px;right:16px;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:6px">
+<div style="position:fixed;bottom:max(20px,env(safe-area-inset-bottom,20px));right:16px;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:6px">
   <button onclick="pushToCloud()" title="推送到雲端"
     style="width:52px;height:52px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">☁️</button>
   <button onclick="pullFromCloud()" title="從雲端載入"
     style="width:52px;height:52px;border-radius:50%;border:none;background:var(--teal);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">⬇️</button>
   <div id="float-sync-label" style="font-size:11px;color:#888;text-align:center;line-height:1.2"></div>
 </div>
+
+<!-- AG CLOSE TRADE MODAL -->
+<div id="agCloseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;align-items:center;justify-content:center">
+  <div class="modal-inner" style="background:white;border-radius:12px;padding:20px;width:380px;max-width:95vw">
+    <h3 id="agCloseTitle" style="margin-bottom:4px;color:var(--amber)">💰 平倉</h3>
+    <div id="agCloseInfo" style="font-size:12px;color:var(--gray-dark);margin-bottom:14px"></div>
+    <div class="form-group">
+      <label>賣出股數 <span style="font-weight:400;color:var(--gray-dark)">(最多 <span id="agCloseMaxShares">0</span> 股)</span></label>
+      <input type="number" id="agCloseShares" min="1" step="1" placeholder="股數">
+    </div>
+    <div class="form-group">
+      <label>賣出價格</label>
+      <input type="number" id="agClosePrice" step="0.01" placeholder="賣出價">
+    </div>
+    <div class="form-group">
+      <label>賣出日期</label>
+      <input type="date" id="agCloseDate">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('agCloseModal').style.display='none'">取消</button>
+      <button class="btn btn-amber" style="flex:1" onclick="agConfirmClose()">✅ 確認平倉</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

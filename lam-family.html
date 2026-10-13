@@ -4287,44 +4287,99 @@ async function agFetchHistoricalPrices() {
   const bdEl = document.getElementById('ag-dp-breakdown');
   if (bdEl) bdEl.innerHTML = `<span style="color:var(--gray-dark)">⏳ 抓取 ${dateStr} 各股收市價中…</span>`;
 
-  // Use Yahoo Finance (free, no API key) — ±3 day window to catch timezone & holiday edges
-  const utcMid   = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
-  const period1  = utcMid - 3 * 86400;
-  const period2  = utcMid + 3 * 86400;
-  const targetTs = utcMid + 28800; // 08:00 UTC = 16:00 HKT close anchor
+  const utcMid  = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
+  const period1 = utcMid - 3 * 86400;
+  const period2 = utcMid + 3 * 86400;
+  const targetTs = utcMid + 28800; // 08:00 UTC ≈ 16:00 HKT close anchor
+  // Stooq date window (YYYYMMDD)
+  const stooqD1 = new Date((utcMid - 3*86400)*1000).toISOString().slice(0,10).replace(/-/g,'');
+  const stooqD2 = new Date((utcMid + 3*86400)*1000).toISOString().slice(0,10).replace(/-/g,'');
 
-  async function yahooFetch(sym) {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${period1}&period2=${period2}&interval=1d`;
-    // Try direct first; if CORS blocks, fall back to corsproxy.io
-    const urls = [url, `https://corsproxy.io/?url=${encodeURIComponent(url)}`];
-    for (const u of urls) {
-      try {
-        const r = await fetch(u, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const result = data?.chart?.result?.[0];
-        if (!result) continue;
-        const timestamps = result.timestamp || [];
-        const closes = result.indicators?.quote?.[0]?.close || [];
-        if (!timestamps.length) continue;
-        // Pick the candle on or closest to our target date (within 2 days)
-        let bestIdx = -1, bestDiff = Infinity;
-        timestamps.forEach((ts, i) => {
-          if (closes[i] == null) return;
-          const diff = Math.abs(ts - targetTs);
-          if (diff < bestDiff && diff < 2 * 86400) { bestDiff = diff; bestIdx = i; }
-        });
-        if (bestIdx >= 0) return closes[bestIdx];
-      } catch { /* try next */ }
-    }
+  // Convert Yahoo-style symbol → Stooq symbol
+  // e.g. 0700.HK → 0700.hk, NVDA → nvda.us
+  function toStooqSym(code) {
+    const u = code.toUpperCase();
+    if (/\.(HK|T|KS|TW|SS|SZ)$/.test(u)) return code.toLowerCase();
+    if (/^[A-Z]{1,5}$/.test(u)) return u.toLowerCase() + '.us';
+    return code.toLowerCase();
+  }
+
+  // Parse Stooq CSV → close price for target date (or nearest)
+  function parseStooqCsv(csv) {
+    if (!csv || csv.toLowerCase().includes('no data')) return null;
+    const lines = csv.trim().split('\n').filter(l => l.trim() && !l.startsWith('Date'));
+    if (!lines.length) return null;
+    // Prefer exact date match; fallback to last row (most recent)
+    const exactLine = lines.find(l => l.startsWith(dateStr));
+    const line = exactLine || lines[lines.length - 1];
+    const parts = line.split(',');
+    const price = parseFloat(parts[4]); // Close is column 4
+    return isNaN(price) ? null : price;
+  }
+
+  // Parse Yahoo Finance JSON → close price closest to targetTs
+  function parseYahooJson(data) {
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+    const timestamps = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    let bestIdx = -1, bestDiff = Infinity;
+    timestamps.forEach((ts, i) => {
+      if (closes[i] == null) return;
+      const diff = Math.abs(ts - targetTs);
+      if (diff < bestDiff && diff < 2 * 86400) { bestDiff = diff; bestIdx = i; }
+    });
+    return bestIdx >= 0 ? closes[bestIdx] : null;
+  }
+
+  async function fetchPrice(code) {
+    const sym = code.toUpperCase();
+    const stooqSym = toStooqSym(code);
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${period1}&period2=${period2}&interval=1d`;
+
+    // ① Stooq CSV (free, CORS-friendly)
+    try {
+      const r = await fetch(
+        `https://stooq.com/q/d/l/?s=${stooqSym}&d1=${stooqD1}&d2=${stooqD2}&i=d`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (r.ok) {
+        const price = parseStooqCsv(await r.text());
+        if (price !== null) return price;
+      }
+    } catch {}
+
+    // ② allorigins proxy → Yahoo Finance
+    try {
+      const r = await fetch(
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (r.ok) {
+        const price = parseYahooJson(await r.json());
+        if (price !== null) return price;
+      }
+    } catch {}
+
+    // ③ corsproxy.io → Yahoo Finance
+    try {
+      const r = await fetch(
+        `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (r.ok) {
+        const price = parseYahooJson(await r.json());
+        if (price !== null) return price;
+      }
+    } catch {}
+
     return null;
   }
 
   let ok = 0, fail = 0, failCodes = [];
   if (!agState.currentPrices) agState.currentPrices = {};
   for (const code of codes) {
-    const sym = code.toUpperCase();
-    const price = await yahooFetch(sym);
+    const price = await fetchPrice(code);
     if (price !== null) {
       agState.currentPrices[code] = price;
       ok++;

@@ -4283,38 +4283,54 @@ async function agFetchHistoricalPrices() {
   if (!dateStr) { showToast('請先選擇日期'); return; }
   const open = agState.trades.filter(t => t.status !== 'closed');
   if (!open.length) { showToast('暫無持倉可查詢'); return; }
-  const finnhubKey = localStorage.getItem('finnhub_key') || '';
-  if (!finnhubKey) { showToast('請先在設定中填入 Finnhub API Key'); return; }
   const codes = [...new Set(open.map(t => t.code))];
-  // Wide ±15hr window around UTC midnight to cover all timezones:
-  //   HK stocks: midnight HKT = UTC-8hr (previous UTC day evening)
-  //   US stocks: midnight ET  = UTC+4~5hr (same UTC day)
-  const utcMid   = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
-  const from     = utcMid - 54000;       // 15 hrs before UTC midnight
-  const to       = utcMid + 86400 + 54000; // 15 hrs after next UTC midnight
-  const targetTs = utcMid + 43200;       // noon UTC = pick-closest anchor
   const bdEl = document.getElementById('ag-dp-breakdown');
   if (bdEl) bdEl.innerHTML = `<span style="color:var(--gray-dark)">⏳ 抓取 ${dateStr} 各股收市價中…</span>`;
+
+  // Use Yahoo Finance (free, no API key) — ±3 day window to catch timezone & holiday edges
+  const utcMid   = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
+  const period1  = utcMid - 3 * 86400;
+  const period2  = utcMid + 3 * 86400;
+  const targetTs = utcMid + 28800; // 08:00 UTC = 16:00 HKT close anchor
+
+  async function yahooFetch(sym) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${period1}&period2=${period2}&interval=1d`;
+    // Try direct first; if CORS blocks, fall back to corsproxy.io
+    const urls = [url, `https://corsproxy.io/?url=${encodeURIComponent(url)}`];
+    for (const u of urls) {
+      try {
+        const r = await fetch(u, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const result = data?.chart?.result?.[0];
+        if (!result) continue;
+        const timestamps = result.timestamp || [];
+        const closes = result.indicators?.quote?.[0]?.close || [];
+        if (!timestamps.length) continue;
+        // Pick the candle on or closest to our target date (within 2 days)
+        let bestIdx = -1, bestDiff = Infinity;
+        timestamps.forEach((ts, i) => {
+          if (closes[i] == null) return;
+          const diff = Math.abs(ts - targetTs);
+          if (diff < bestDiff && diff < 2 * 86400) { bestDiff = diff; bestIdx = i; }
+        });
+        if (bestIdx >= 0) return closes[bestIdx];
+      } catch { /* try next */ }
+    }
+    return null;
+  }
+
   let ok = 0, fail = 0, failCodes = [];
   if (!agState.currentPrices) agState.currentPrices = {};
   for (const code of codes) {
     const sym = code.toUpperCase();
-    try {
-      const r = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(sym)}&resolution=D&from=${from}&to=${to}&token=${finnhubKey}`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      const d = await r.json();
-      if (d.s === 'ok' && d.c && d.c.length > 0 && d.t && d.t.length > 0) {
-        // Pick candle whose timestamp is closest to noon UTC of the requested date
-        let bestIdx = 0, bestDiff = Infinity;
-        d.t.forEach((ts, i) => { const diff = Math.abs(ts - targetTs); if (diff < bestDiff) { bestDiff = diff; bestIdx = i; } });
-        agState.currentPrices[code] = d.c[bestIdx];
-        ok++;
-      } else {
-        fail++; failCodes.push(code);
-      }
-    } catch { fail++; failCodes.push(code); }
+    const price = await yahooFetch(sym);
+    if (price !== null) {
+      agState.currentPrices[code] = price;
+      ok++;
+    } else {
+      fail++; failCodes.push(code);
+    }
   }
   agSave();
   if (ok > 0) {

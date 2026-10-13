@@ -4286,9 +4286,13 @@ async function agFetchHistoricalPrices() {
   const finnhubKey = localStorage.getItem('finnhub_key') || '';
   if (!finnhubKey) { showToast('請先在設定中填入 Finnhub API Key'); return; }
   const codes = [...new Set(open.map(t => t.code))];
-  // Convert date to UTC Unix timestamps (HK market: +08:00; US market: covers the day in ET)
-  const dayStart = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
-  const dayEnd   = dayStart + 86400;
+  // Wide ±15hr window around UTC midnight to cover all timezones:
+  //   HK stocks: midnight HKT = UTC-8hr (previous UTC day evening)
+  //   US stocks: midnight ET  = UTC+4~5hr (same UTC day)
+  const utcMid   = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
+  const from     = utcMid - 54000;       // 15 hrs before UTC midnight
+  const to       = utcMid + 86400 + 54000; // 15 hrs after next UTC midnight
+  const targetTs = utcMid + 43200;       // noon UTC = pick-closest anchor
   const bdEl = document.getElementById('ag-dp-breakdown');
   if (bdEl) bdEl.innerHTML = `<span style="color:var(--gray-dark)">⏳ 抓取 ${dateStr} 各股收市價中…</span>`;
   let ok = 0, fail = 0, failCodes = [];
@@ -4297,12 +4301,15 @@ async function agFetchHistoricalPrices() {
     const sym = code.toUpperCase();
     try {
       const r = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(sym)}&resolution=D&from=${dayStart}&to=${dayEnd}&token=${finnhubKey}`,
+        `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(sym)}&resolution=D&from=${from}&to=${to}&token=${finnhubKey}`,
         { signal: AbortSignal.timeout(8000) }
       );
       const d = await r.json();
-      if (d.s === 'ok' && d.c && d.c.length > 0) {
-        agState.currentPrices[code] = d.c[d.c.length - 1];  // last close in range
+      if (d.s === 'ok' && d.c && d.c.length > 0 && d.t && d.t.length > 0) {
+        // Pick candle whose timestamp is closest to noon UTC of the requested date
+        let bestIdx = 0, bestDiff = Infinity;
+        d.t.forEach((ts, i) => { const diff = Math.abs(ts - targetTs); if (diff < bestDiff) { bestDiff = diff; bestIdx = i; } });
+        agState.currentPrices[code] = d.c[bestIdx];
         ok++;
       } else {
         fail++; failCodes.push(code);
@@ -4311,13 +4318,12 @@ async function agFetchHistoricalPrices() {
   }
   agSave();
   if (ok > 0) {
-    showToast(`✅ 已取得 ${dateStr} 收市價 (${ok} 隻)`);
+    showToast(`✅ 已取得 ${dateStr} 收市價 (${ok} 隻)${fail > 0 ? ` · ${failCodes.join(',')} 無數據` : ''}`);
     agDpAutoFill();
   } else {
-    showToast(`❌ ${dateStr} 無收市數據（可能是假期/週末）`);
-    if (bdEl) bdEl.innerHTML = `<span style="color:var(--red)">❌ ${dateStr} 無收市數據（假期或週末），請手動輸入</span>`;
+    showToast(`❌ ${dateStr} 無收市數據（假期或週末）`);
+    if (bdEl) bdEl.innerHTML = `<span style="color:var(--red)">❌ ${dateStr} 無收市數據，請確認是否開市日，或手動輸入</span>`;
   }
-  if (fail > 0 && ok > 0) showToast(`⚠️ ${failCodes.join(', ')} 無數據`);
 }
 
 // ── TRADES ────────────────────────────────────────────────────

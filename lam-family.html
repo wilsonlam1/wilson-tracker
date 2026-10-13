@@ -1182,7 +1182,8 @@
           <label style="font-size:11px">組合總值 (HK$)</label>
           <input type="number" id="ag-dp-total" placeholder="0">
         </div>
-        <div style="align-self:flex-end">
+        <div style="align-self:flex-end;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="agFetchHistoricalPrices()" title="抓取該日收市價後自動填入">📅 抓取歷史收市價</button>
           <button class="btn btn-ghost btn-sm" onclick="agDpAutoFill()">🔄 自動填入</button>
         </div>
       </div>
@@ -4276,6 +4277,49 @@ async function agFetchAllPrices() {
   }
 }
 
+// ── FETCH HISTORICAL CLOSING PRICES ──────────────────────────
+async function agFetchHistoricalPrices() {
+  const dateStr = document.getElementById('ag-dp-date').value;
+  if (!dateStr) { showToast('請先選擇日期'); return; }
+  const open = agState.trades.filter(t => t.status !== 'closed');
+  if (!open.length) { showToast('暫無持倉可查詢'); return; }
+  const finnhubKey = localStorage.getItem('finnhub_key') || '';
+  if (!finnhubKey) { showToast('請先在設定中填入 Finnhub API Key'); return; }
+  const codes = [...new Set(open.map(t => t.code))];
+  // Convert date to UTC Unix timestamps (HK market: +08:00; US market: covers the day in ET)
+  const dayStart = Math.floor(new Date(dateStr + 'T00:00:00Z').getTime() / 1000);
+  const dayEnd   = dayStart + 86400;
+  const bdEl = document.getElementById('ag-dp-breakdown');
+  if (bdEl) bdEl.innerHTML = `<span style="color:var(--gray-dark)">⏳ 抓取 ${dateStr} 各股收市價中…</span>`;
+  let ok = 0, fail = 0, failCodes = [];
+  if (!agState.currentPrices) agState.currentPrices = {};
+  for (const code of codes) {
+    const sym = code.toUpperCase();
+    try {
+      const r = await fetch(
+        `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(sym)}&resolution=D&from=${dayStart}&to=${dayEnd}&token=${finnhubKey}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      const d = await r.json();
+      if (d.s === 'ok' && d.c && d.c.length > 0) {
+        agState.currentPrices[code] = d.c[d.c.length - 1];  // last close in range
+        ok++;
+      } else {
+        fail++; failCodes.push(code);
+      }
+    } catch { fail++; failCodes.push(code); }
+  }
+  agSave();
+  if (ok > 0) {
+    showToast(`✅ 已取得 ${dateStr} 收市價 (${ok} 隻)`);
+    agDpAutoFill();
+  } else {
+    showToast(`❌ ${dateStr} 無收市數據（可能是假期/週末）`);
+    if (bdEl) bdEl.innerHTML = `<span style="color:var(--red)">❌ ${dateStr} 無收市數據（假期或週末），請手動輸入</span>`;
+  }
+  if (fail > 0 && ok > 0) showToast(`⚠️ ${failCodes.join(', ')} 無數據`);
+}
+
 // ── TRADES ────────────────────────────────────────────────────
 function agAddTrade() {
   const code = document.getElementById('ag-t-code').value.trim().toUpperCase();
@@ -4594,6 +4638,25 @@ function agRenderClosedTrades() {
       </td>
     </tr>`;
   });
+  // ── TOTAL SUMMARY ROW ──
+  const validClosed = sortedClosed.filter(t => agCalcNetPlHKD(t) !== null);
+  const totalNetHKD = validClosed.reduce((s, t) => s + agCalcNetPlHKD(t), 0);
+  const winCount    = validClosed.filter(t => agCalcNetPlHKD(t) > 0).length;
+  const lossCount   = validClosed.filter(t => agCalcNetPlHKD(t) <= 0).length;
+  const winRate     = validClosed.length ? Math.round(winCount / validClosed.length * 100) : 0;
+  const totalColor  = totalNetHKD >= 0 ? 'var(--green)' : 'var(--red)';
+  const totalSign   = totalNetHKD >= 0 ? '+' : '';
+  html += `<tfoot><tr style="background:var(--blue);color:#fff;font-weight:700">
+    <td colspan="2">合計 ${closed.length} 筆</td>
+    <td colspan="5" style="font-size:11px">
+      ✅ 勝 ${winCount} · ❌ 敗 ${lossCount} · 勝率 ${winRate}%
+    </td>
+    <td colspan="3" style="text-align:right;font-size:11px">總 P&L：</td>
+    <td style="color:${totalNetHKD>=0?'#7DFFB3':'#FFB3B3'};font-size:14px;font-weight:800;text-align:right">
+      ${totalSign}HK$${Math.round(totalNetHKD).toLocaleString()}
+    </td>
+    <td colspan="2"></td>
+  </tr></tfoot>`;
   html += '</table></div>';
   el.innerHTML = html;
 }
